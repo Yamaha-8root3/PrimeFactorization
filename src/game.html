@@ -1,0 +1,64 @@
+<!-- index.html -->
+<div class="app">
+  <main class="game">
+    <header class="topbar">
+      <section class="panel stat">
+        <div class="label">残り時間</div>
+        <div id="timer" class="big">100.000</div>
+      </section>
+      <section class="panel stat">
+        <div class="label">スコア</div>
+        <div id="score" class="big">0</div>
+        <div id="gain" class="gain"></div>
+      </section>
+    </header>
+    <section class="problem">
+      <div id="target" class="target"></div>
+      <div class="originaltarget"><span id="originaltarget"></span></div>
+    </section>
+
+    <section id="answer-sec" class="answer">
+      <div class="label">入力 <span id="err" class="err" hidden>誤りあり</span></div>
+      <div id="answer" class="answer-row"></div>
+      <div class="line">
+        <span class="tag">&gt;</span>
+        <div id="expo-input" class="expo"></div>
+      </div>
+      <div class="line">
+        <span class="tag">&gt;&gt;</span>
+        <div id="expo-all" class="expo"></div>
+      </div>
+    </section>
+
+    <section class="controls">
+      <div id="prime-buttons" class="prime-buttons"></div>
+      <div class="actions">
+        <button id="btn-undo" class="btn sub">戻す<kbd>Backspace</kbd></button>
+        <button id="btn-clear" class="btn sub">全消去<kbd>Esc</kbd></button>
+        <button id="btn-divide" class="btn main">仮決定（割る）<kbd>Enter</kbd></button>
+      </div>
+    </section>
+  </main>
+
+  <aside class="side">
+    <section class="panel">
+      <div class="label">難易度</div>
+      <div class="diff-row"><span>この問題</span><b id="diff">0.0</b></div>
+      <div class="diff-row"><span>Range</span><b id="range">0.0 – 0.0</b></div>
+      <div class="diff-row"><span>使用素数</span><b id="maxp">≤ 5</b></div>
+    </section>
+    <section class="panel">
+      <div class="label">統計</div>
+      <div class="diff-row"><span>正解</span><b id="st-solved">0</b></div>
+      <div class="diff-row"><span>誤り</span><b id="st-miss">0</b></div>
+      <div class="diff-row"><span>平均</span><b id="st-avg">-</b></div>
+      <div class="diff-row"><span>ハイスコア</span><b id="st-best">0</b></div>
+    </section>
+  </aside>
+  <aside class="hist">
+    <section class="panel history-panel">
+      <div class="label">問題履歴</div>
+      <ul id="history" class="history"></ul>
+    </section>
+  </aside>
+</div>
