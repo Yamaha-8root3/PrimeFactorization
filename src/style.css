@@ -168,14 +168,21 @@ kbd {
 }
 .answer-row {
   font-size: 18px;
-  font-weight: 600;
-  min-height: 1.6em;
+  height: 2em;
+  min-height: 0;
+  line-height: 1.5;
 }
 .expo {
   font-size: 13px;
   color: var(--muted);
-  min-height: 20px;
+  height: 1.6em;
+  min-height: 0;
+  line-height: 1.4;
 }
+.answer-row::before,
+.expo::before {
+  content: "\200b";
+} /* 空でも1行ぶんの行ボックスを確保 */
 .ltr {
   direction: ltr;
   unicode-bidi: isolate;
@@ -186,6 +193,14 @@ kbd {
   margin-right: 0.25em;
   border: 1px solid var(--border);
   border-radius: 0.3em;
+}
+.chip.typing {
+  border-style: dashed;
+  color: var(--muted);
+}
+.chip.typing.bad {
+  border-color: var(--ng);
+  color: var(--ng);
 }
 .answer .label:not(:first-child) {
   margin-top: 12px;
@@ -301,6 +316,11 @@ kbd {
 }
 .history sup {
   font-size: 0.7em;
+}
+
+sup,
+sub {
+  line-height: 0;
 }
 
 /* リザルト */
@@ -461,7 +481,7 @@ kbd {
 /* line */
 .line {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   margin-top: 6px;
 }
@@ -475,4 +495,88 @@ kbd {
 .line .expo {
   flex: 1;
   min-width: 0;
+}
+
+/* animation */
+.row-wrap {
+  display: grid;
+  align-items: start;
+}
+.row-wrap > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+} /* 同じセルに重ねる */
+.row-wrap .answer-row {
+  z-index: 1;
+}
+.answer-row .chip {
+  background: var(--panel);
+}
+.trial {
+  display: flex;
+  justify-self: start;
+  z-index: 0;
+  pointer-events: none;
+  font-size: 18px;
+  font-weight: 600;
+}
+.trial .chip {
+  animation: q-ok var(--t) ease-out both;
+  animation-delay: var(--d);
+}
+.trial .chip.ng {
+  animation-name: q-ng;
+}
+.trial .chip.skip {
+  animation-name: q-skip;
+}
+
+@keyframes q-ok {
+  0% {
+    border-color: var(--border);
+    color: var(--text);
+    opacity: 1;
+  }
+  30% {
+    border-color: var(--ok);
+    color: var(--ok);
+    opacity: 1;
+  }
+  100% {
+    border-color: var(--ok);
+    color: var(--ok);
+    opacity: 0;
+  }
+}
+@keyframes q-ng {
+  0% {
+    border-color: var(--border);
+    color: var(--text);
+    opacity: 1;
+  }
+  30% {
+    border-color: var(--ng);
+    color: var(--ng);
+    opacity: 1;
+  }
+  70% {
+    border-color: var(--ng);
+    color: var(--ng);
+    opacity: 1;
+  }
+  100% {
+    border-color: var(--ng);
+    color: var(--ng);
+    opacity: 0;
+  }
+}
+@keyframes q-skip {
+  0% {
+    border-color: var(--border);
+    color: var(--text);
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }

@@ -18,8 +18,11 @@
     </section>
 
     <section id="answer-sec" class="answer">
-      <div class="label">入力 <span id="err" class="err" hidden>誤りあり</span></div>
-      <div id="answer" class="answer-row"></div>
+      <div class="label">入力 <span id="err" class="err" hidden>ミス!</span></div>
+      <div class="row-wrap">
+        <div id="trial" class="trial"></div>
+        <div id="answer" class="answer-row"></div>
+      </div>
       <div class="line">
         <span class="tag">&gt;</span>
         <div id="expo-input" class="expo"></div>
@@ -31,11 +34,12 @@
     </section>
 
     <section class="controls">
+      <div class="label">ボタンまたは数字+スペースで入力</div>
       <div id="prime-buttons" class="prime-buttons"></div>
       <div class="actions">
-        <button id="btn-undo" class="btn sub">戻す<kbd>Backspace</kbd></button>
-        <button id="btn-clear" class="btn sub">全消去<kbd>Esc</kbd></button>
-        <button id="btn-divide" class="btn main">仮決定（割る）<kbd>Enter</kbd></button>
+        <button id="btn-undo" class="btn sub">1つ消す<kbd>Backspace</kbd></button>
+        <button id="btn-clear" class="btn sub">クリア<kbd>Esc</kbd></button>
+        <button id="btn-divide" class="btn main">割る<kbd>Enter</kbd></button>
       </div>
     </section>
   </main>
@@ -50,7 +54,7 @@
     <section class="panel">
       <div class="label">統計</div>
       <div class="diff-row"><span>正解</span><b id="st-solved">0</b></div>
-      <div class="diff-row"><span>誤り</span><b id="st-miss">0</b></div>
+      <div class="diff-row"><span>ミス</span><b id="st-miss">0</b></div>
       <div class="diff-row"><span>平均</span><b id="st-avg">-</b></div>
       <div class="diff-row"><span>ハイスコア</span><b id="st-best">0</b></div>
     </section>
@@ -61,4 +65,12 @@
       <ul id="history" class="history"></ul>
     </section>
   </aside>
+</div>
+<div id="result" class="result">
+  <div class="result-box">
+    <div class="label">Result</div>
+    <div id="final-score" class="big"></div>
+    <dl id="final-detail" class="stats"></dl>
+    <button id="btn-restart" class="btn main">もう一度<kbd>Enter</kbd></button>
+  </div>
 </div>

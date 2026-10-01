@@ -2,34 +2,8 @@ import "./style.css";
 import { generate, prod, scoreOf, progressOf, stageOf, PRIME_POOL, type Stage } from "./generator";
 import html from "./game.html?raw";
 
+//HTML構成
 document.querySelector<HTMLDivElement>("#game")!.innerHTML = html;
-
-const KEYMAP: Record<string, number> = {
-  q: 2,
-  w: 3,
-  e: 5,
-  r: 7,
-  t: 11,
-  y: 13,
-  u: 17,
-  i: 19,
-  a: 23,
-  s: 29,
-  d: 31,
-  f: 37,
-  g: 41,
-  h: 43,
-  j: 47,
-  k: 53
-};
-
-type Rec = { n: number; factors: number[]; d: number; ms: number; miss: number; pts: number };
-const solveLog: { n: number; d: number; ms: number; miss: number }[] = [];
-
-const TIME_LIMIT = 100_000; // ms
-let running = false;
-let gameStart = 0;
-
 const $ = (id: string) => document.getElementById(id)!;
 const el = {
   target: $("target"),
@@ -48,8 +22,43 @@ const el = {
   stSolved: $("st-solved"),
   stMiss: $("st-miss"),
   stAvg: $("st-avg"),
-  stBest: $("st-best")
+  stBest: $("st-best"),
+  trial: $("trial")
 };
+
+//素数ボタン用意
+const KEYMAP: Record<string, number> = {
+  q: 2,
+  w: 3,
+  e: 5,
+  r: 7,
+  t: 11,
+  y: 13,
+  u: 17,
+  i: 19,
+  a: 23,
+  s: 29,
+  d: 31,
+  f: 37,
+  g: 41,
+  h: 43,
+  j: 47,
+  k: 53
+};
+const keyOf = (p: number) =>
+  Object.keys(KEYMAP)
+    .find((k) => KEYMAP[k] === p)
+    ?.toUpperCase() ?? "";
+$("prime-buttons").innerHTML = PRIME_POOL.map((p) => `<button class="prime-btn" data-prime="${p}"><span class="num">${p}</span><kbd>${keyOf(p)}</kbd></button>`).join("");
+
+//変数
+type Rec = { n: number; factors: number[]; d: number; ms: number; miss: number; pts: number };
+const solveLog: { n: number; d: number; ms: number; miss: number }[] = [];
+type Verdict = { v: number; state: "ok" | "ng" | "skip" };
+
+const TIME_LIMIT = 100_000; // ms
+let running = false;
+let gameStart = 0;
 
 let target = 0;
 let entered: number[] = [];
@@ -59,13 +68,19 @@ let startedAt = 0;
 const history: Rec[] = [];
 let miss = 0;
 let progress = 0;
+let curDiff = 0;
+let curStage: Stage = stageOf(0);
+let AUTO_FINISH = false; // 一時停止中。true で従来の「積が一致したら自動回答」に戻る
+const STEP = 50; // ms。判定済みの項目を順に消す演出の間隔
+const T = { ok: 100, ng: 300, skip: 200 }; // ms
+let trialSeq = 0;
+let queueEndAt = 0; // 演出キューが終わる時刻
 
-const keyOf = (p: number) =>
-  Object.keys(KEYMAP)
-    .find((k) => KEYMAP[k] === p)
-    ?.toUpperCase() ?? "";
-$("prime-buttons").innerHTML = PRIME_POOL.map((p) => `<button class="prime-btn" data-prime="${p}"><span class="num">${p}</span><kbd>${keyOf(p)}</kbd></button>`).join("");
+//キーボード入力
+const BUF_MAX = 6;
+let buf = "";
 
+//素因数分解の整形テキスト生成
 function expo(list: number[], html: boolean): string {
   const m = new Map<number, number>();
   [...list].sort((a, b) => a - b).forEach((p) => m.set(p, (m.get(p) ?? 0) + 1));
@@ -78,13 +93,11 @@ function nextProblem() {
   curStage = pb.stage;
   curDiff = pb.d;
   entered = [];
+  buf = "";
   committed = 0;
   startedAt = performance.now();
   render();
 }
-
-let curDiff = 0;
-let curStage: Stage = stageOf(0);
 
 function render() {
   el.target.textContent = String(target / prod(entered.slice(0, committed)));
@@ -96,7 +109,9 @@ function render() {
     .join("");
   // 確定分＋未確定分の整形済み表示
   const pending = entered.slice(committed);
-  el.answer.innerHTML = `<span class="ltr">${pending.map((p) => `<span class="chip">${p}</span>`).join("")}</span>`;
+  const bad = buf !== "" && !PRIME_POOL.includes(Number(buf));
+  const typing = buf ? `<span class="chip typing${bad ? " bad" : ""}">${buf}</span>` : "";
+  el.answer.innerHTML = `<span class="ltr">${pending.map((p) => `<span class="chip">${p}</span>`).join("")}${typing}</span>`;
   el.expoInput.innerHTML = `<span class="ltr">${expo(pending, true)}</span>`;
   el.expoAll.innerHTML = `<span class="ltr">${expo(entered, true)}</span>`;
   el.err.hidden = true;
@@ -114,11 +129,104 @@ function render() {
   document.querySelectorAll<HTMLElement>(".prime-btn").forEach((b) => b.classList.toggle("out", Number(b.dataset.prime) > curStage.maxPrime));
 }
 
+function typeDigit(d: string) {
+  if (buf === "" && d === "0") return; // 先頭の 0 は無視（0 による除算を防ぐ）
+  if (buf.length >= BUF_MAX) return;
+  buf += d;
+  render();
+}
+function backBuf() {
+  buf = buf.slice(0, -1);
+  render();
+}
+function commitBuf() {
+  if (!buf) return;
+  const v = Number(buf);
+  buf = "";
+  if (!PRIME_POOL.includes(v)) {
+    render();
+    return;
+  } else {
+    addPrime(v);
+  }
+}
+
 function addPrime(p: number) {
   if (!running) return;
   entered.push(p);
-  if (prod(entered) === target) finish();
+  if (AUTO_FINISH && prod(entered) === target) finish();
   else render();
+}
+
+function clearInput() {
+  if (!running) return;
+  entered.length = committed;
+  buf = "";
+  render();
+}
+
+function undo() {
+  if (!running) return;
+  if (entered.length > committed) {
+    entered.pop();
+    render();
+  }
+}
+
+function divide() {
+  if (!running) return;
+  commitBuf();
+  const pending = entered.slice(committed);
+  if (!pending.length) return;
+
+  let rem = target / prod(entered.slice(0, committed));
+  const verdicts: Verdict[] = [];
+  let stopped = false;
+  for (const p of pending) {
+    if (stopped) {
+      verdicts.push({ v: p, state: "skip" });
+      continue;
+    }
+    const ok = rem % p === 0;
+    verdicts.push({ v: p, state: ok ? "ok" : "ng" });
+    if (ok) rem /= p;
+    else stopped = true;
+  }
+  const okCount = verdicts.filter((x) => x.state === "ok").length;
+
+  playTrial(verdicts);
+  if (stopped) {
+    miss++;
+    $("err").hidden = false;
+  }
+  entered.length = committed + okCount;
+  committed = entered.length;
+
+  if (rem === 1) finish();
+  else render();
+}
+
+// 判定済みの項目から順に消す演出。未判定の項目は表示したまま残る
+// 実行中のキューがあれば、その後ろに追加して順番に再生する
+function playTrial(vs: Verdict[]) {
+  const box = $("trial");
+  const now = performance.now();
+  const base = Math.max(0, queueEndAt - now);
+  const okCount = vs.filter((x) => x.state === "ok").length;
+  let end = 0;
+  const html = vs
+    .map((x, i) => {
+      const d = base + (x.state === "skip" ? okCount + 1 : i) * STEP;
+      end = Math.max(end, d + T[x.state]);
+      return `<span class="chip ${x.state}" style="--d:${d}ms;--t:${T[x.state]}ms">${x.v}</span>`;
+    })
+    .join("");
+  box.insertAdjacentHTML("beforeend", html);
+  queueEndAt = now + end;
+  const my = ++trialSeq;
+  setTimeout(() => {
+    if (my === trialSeq) box.replaceChildren();
+  }, end + 50);
 }
 
 function finish() {
@@ -137,32 +245,6 @@ function finish() {
   nextProblem();
 }
 
-function clearInput() {
-  if (!running) return;
-  if (entered.length === committed) return;
-  entered.length = committed;
-  render();
-}
-
-function divide() {
-  if (!running) return;
-  if (entered.length === committed) return;
-  if (target % prod(entered) !== 0) {
-    el.err.hidden = false; // 位置は示さない
-    miss++;
-    return;
-  }
-  committed = entered.length;
-  render();
-}
-
-function undo() {
-  if (!running) return;
-  if (entered.length > committed) {
-    entered.pop();
-    render();
-  }
-}
 function summarize(recs: Rec[]) {
   const n = recs.length;
   const sum = (f: (r: Rec) => number) => recs.reduce((s, r) => s + f(r), 0);
@@ -194,11 +276,19 @@ document.querySelectorAll<HTMLElement>(".prime-btn").forEach((b) => b.addEventLi
 $("btn-divide").addEventListener("click", divide);
 $("btn-undo").addEventListener("click", undo);
 document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === "Enter") {
     e.preventDefault();
     return running ? divide() : startGame();
   }
-  if (e.key === "Backspace") return undo();
+  if (!running) return;
+  if (/^[0-9]$/.test(e.key)) return typeDigit(e.key);
+  if (e.key === " ") {
+    e.preventDefault();
+    (document.activeElement as HTMLElement | null)?.blur(); // フォーカス中のボタンの二重発火を防ぐ
+    return commitBuf();
+  }
+  if (e.key === "Backspace") return buf ? backBuf() : undo();
   if (e.key === "Escape") return clearInput();
   const p = KEYMAP[e.key.toLowerCase()];
   if (p !== undefined) addPrime(p);
@@ -210,7 +300,7 @@ document.querySelectorAll<HTMLElement>(".prime-btn").forEach((b) => {
 });
 
 $("btn-clear").addEventListener("click", clearInput);
-
+$("trial").replaceChildren();
 window.addEventListener("resize", render);
 
 setInterval(tick, 16);
