@@ -40,7 +40,8 @@ const UNLOCK: [number, number][] = [
   [67, 47],
   [75, 53]
 ];
-const DIFF = { count: 0.3, repeat: 0.6, digit: 0.4, pairNerf: 1.0 };
+const DIFF = { count: 0.3, repeat: 0.6, digit: 0.4, pairNerf: 1.0, pair: 0.15 };
+const big = (p: number) => Math.max(0, Math.log2(p / 5));
 const RANGE = {
   dMax0: 3.4, // 初期の難易度上限（据え置き）
   width: 1.5,
@@ -49,9 +50,7 @@ const RANGE = {
   slow: 0.2 // 序盤以降（旧 0.3）
 };
 
-const SCORE_BASE = 1.6;
 const PT = 25;
-const missRate = (miss: number) => Math.max(0.2, 1 - 0.3 * miss);
 
 export function difficulty(f: number[]): number {
   const cnt = new Map<number, number>();
@@ -63,6 +62,8 @@ export function difficulty(f: number[]): number {
   }
   d += (String(prod(f)).length - 1) * DIFF.digit;
   d -= Math.min(cnt.get(2) ?? 0, cnt.get(5) ?? 0) * DIFF.pairNerf;
+  // 大きい素因数どうしの組み合わせ加算
+  for (let i = 0; i < f.length; i++) for (let j = i + 1; j < f.length; j++) d += big(f[i]) * big(f[j]) * DIFF.pair;
   return Math.max(0, d);
 }
 
@@ -109,9 +110,6 @@ export function generate(solved: number): Problem {
   return best;
 }
 
-export function scoreOf(d: number, miss: number): number {
-  return Math.max(1, Math.round(10 * SCORE_BASE ** d * missRate(miss)));
-}
-export function progressOf(d: number, miss: number): number {
-  return Math.max(1, Math.round(d * 10 * missRate(miss)));
+export function progressOf(d: number): number {
+  return Math.max(1, Math.round(d * 10));
 }
