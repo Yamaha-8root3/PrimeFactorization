@@ -44,7 +44,8 @@ const el = {
   stMiss: $("st-miss"),
   stAvg: $("st-avg"),
   stBest: $("st-best"),
-  trial: $("trial")
+  trial: $("trial"),
+  qno: $("qno")
 };
 
 //素数ボタン用意
@@ -95,6 +96,7 @@ let target = 0;
 let entered: number[] = [];
 let committed = 0; // 仮決定済みの入力数
 
+let qno = 0;
 let combo = 0;
 let comboShown = 0;
 let maxCombo = 0;
@@ -139,6 +141,7 @@ function expo(list: number[], html: boolean): string {
 
 function nextProblem() {
   const pb = generate(progress);
+  qno++;
   target = pb.n;
   curStage = pb.stage;
   curDiff = pb.d;
@@ -152,6 +155,7 @@ function nextProblem() {
 }
 
 function render() {
+  el.qno.textContent = `Q${qno}`;
   el.target.textContent = String(target / prod(entered.slice(0, committed)));
   el.originaltarget.textContent = String(target);
   // 回答欄は未確定分のみ
@@ -411,8 +415,7 @@ const saveBest = (v: number) => {
 };
 
 document.querySelectorAll<HTMLElement>(".prime-btn").forEach((b) => b.addEventListener("click", () => addPrime(Number(b.dataset.prime))));
-$("btn-divide").addEventListener("click", divide);
-$("btn-undo").addEventListener("click", undo);
+
 document.addEventListener("keydown", (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === "Enter") {
@@ -437,7 +440,6 @@ document.querySelectorAll<HTMLElement>(".prime-btn").forEach((b) => {
   b.querySelector("kbd")!.textContent = key ? key.toUpperCase() : "";
 });
 
-$("btn-clear").addEventListener("click", clearInput);
 $("trial").replaceChildren();
 window.addEventListener("resize", render);
 
@@ -447,6 +449,7 @@ setInterval(tick, 16);
 // --------------------------
 
 function startGame() {
+  qno = 0;
   score = 0;
   miss = 0;
   progress = 0;
@@ -504,3 +507,20 @@ function tick() {
 
 $("btn-restart").addEventListener("click", startGame);
 render();
+
+//レイアウト関連
+const bar = document.querySelector<HTMLElement>(".topbar")!;
+const mq = matchMedia("(max-width: 700px)");
+
+// スマホ幅は常に compact。それ以外はスクロール時のみ（縮小で高さが変わっても
+// ちらつかないよう、入る閾値(48)と戻る閾値(4)を離している）
+function updateBar() {
+  const on = bar.classList.contains("compact");
+  bar.classList.toggle("compact", mq.matches || (on ? scrollY > 4 : scrollY > 48));
+}
+addEventListener("scroll", updateBar, { passive: true });
+mq.addEventListener("change", updateBar);
+
+// トップバーの実際の高さを CSS 変数に渡す（問題パネルの sticky の位置に使用）
+new ResizeObserver(() => document.documentElement.style.setProperty("--bar-h", `${bar.offsetHeight}px`)).observe(bar);
+updateBar();
