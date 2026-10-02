@@ -88,9 +88,8 @@ kbd {
   gap: 16px;
   max-width: none;
   margin: 0;
-  padding: 16px;
-  padding-inline: max(16px, calc((100% - 1100px) / 2 + 16px));
-  padding-bottom: 8px;
+  padding: 0px;
+  padding-inline: 0;
   background: var(--bg);
 }
 .topbar.compact {
@@ -118,7 +117,7 @@ kbd {
 }
 .app {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px 260px;
+  grid-template-columns: minmax(0, 1fr) 220px 300px;
   gap: 16px;
   align-items: start;
   padding-top: 8px;
@@ -408,9 +407,9 @@ kbd {
 .btn {
   flex: 1;
   height: 48px;
+  font-size: 16px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  font-size: 16px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -441,37 +440,70 @@ kbd {
 }
 
 /* 履歴 */
-.history-panel {
-  flex: 1;
-  min-height: 200px;
+.history-head,
+.history li {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 32px 12px 58px 36px;
+  column-gap: 6px;
+  align-items: baseline;
+}
+.history-head {
+  font-size: 11px;
+  color: var(--muted);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.history-head span:nth-child(n + 3) {
+  text-align: right;
 }
 .history {
   list-style: none;
   margin: 0;
   padding: 0;
-  overflow-y: auto;
-  font-size: 14px;
-  max-height: calc(100dvh - 200px);
 }
 .history li {
-  display: flex;
-  justify-content: space-between;
+  font-size: 12px;
   padding: 6px 0;
   border-bottom: 1px solid var(--border);
 }
-.history li span:first-child {
+.history .h-no {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.history .h-n {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.history li.ok {
+.history .h-d,
+.history .h-t {
+  text-align: right;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.history .h-s {
+  text-align: center;
+  color: var(--accent);
+  font-weight: 800;
+}
+.history .h-p {
+  text-align: right;
   color: var(--ok);
+  font-variant-numeric: tabular-nums;
 }
-.history li.ng {
-  color: var(--ng);
+.history li.cur {
+  background: var(--bg);
+  border-radius: 6px;
+  margin-inline: -6px;
+  padding-inline: 6px;
 }
-.history sup {
-  font-size: 0.7em;
+.history li.cur .h-t {
+  color: var(--muted);
+}
+.pf {
+  color: var(--accent);
+  font-weight: 800;
+  font-style: normal;
 }
 
 sup,
@@ -493,7 +525,7 @@ sub {
   display: none;
 }
 .result-box {
-  width: min(92vw, 360px);
+  width: min(92vw, 420);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -560,6 +592,73 @@ sub {
   overflow-wrap: anywhere;
 }
 
+.detail-label {
+  text-align: left;
+  margin: 0;
+}
+.rd-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 34dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+.rd {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  display: grid;
+  gap: 2px;
+}
+.rd-main {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  overflow-wrap: anywhere;
+}
+.rd-no {
+  color: var(--muted);
+  font-size: 11px;
+}
+.rd-d {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.rd-sub {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.rd-pts {
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.rd-pts i {
+  font-style: normal;
+}
+.rd-pts b {
+  color: var(--ok);
+  font-size: 14px;
+}
+.rd-ans {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.rd sup {
+  font-size: 0.7em;
+  line-height: 0;
+}
+
 /* レスポンシブ: 中間幅（2列、履歴は下段） */
 @media (max-width: 1000px) {
   .app {
@@ -575,13 +674,13 @@ sub {
 
 /* レスポンシブ: スマホ */
 @media (max-width: 700px) {
-  .topbar,
   .app {
     padding: 10px;
   }
   .topbar {
     gap: 8px;
-    padding-bottom: 4px;
+    padding: 0px;
+    padding-inline: 0px;
   }
   .problem {
     padding: 6px 12px;
@@ -639,9 +738,6 @@ sub {
   .btn.main {
     order: -1;
     flex: 1 1 100%;
-  }
-  .history {
-    max-height: 200px;
   }
 }
 

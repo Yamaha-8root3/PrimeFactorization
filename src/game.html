@@ -4,7 +4,7 @@
     <header class="topbar">
       <section class="panel stat">
         <div class="label">残り時間</div>
-        <div id="timer" class="big">100.000</div>
+        <div id="timer" class="big">100<small>.000</small></div>
       </section>
       <section class="panel stat">
         <div class="label">スコア</div>
@@ -66,7 +66,7 @@
   </aside>
   <aside class="hist">
     <section class="panel history-panel">
-      <div class="label">問題履歴</div>
+      <div class="history-head"><span>No</span><span>問題</span><span>難度</span><span></span><span>得点</span><span>時間</span></div>
       <ul id="history" class="history"></ul>
     </section>
   </aside>
@@ -76,6 +76,8 @@
     <div class="label">Result</div>
     <div id="final-score" class="big"></div>
     <dl id="final-detail" class="stats"></dl>
+    <div class="label detail-label">Details</div>
+    <ul id="final-list" class="rd-list"></ul>
     <button id="btn-restart" class="btn main">もう一度<kbd>Enter</kbd></button>
   </div>
 </div>

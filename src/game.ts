@@ -1,6 +1,6 @@
 import "./style.css";
 import { generate, prod, progressOf, stageOf, PRIME_POOL, type Stage } from "./generator";
-import { factorPoints } from "./score";
+import { factorPoints, factorBase } from "./score";
 import html from "./game.html?raw";
 
 //HTML構成
@@ -75,7 +75,19 @@ const keyOf = (p: number) =>
 $("prime-buttons").innerHTML = PRIME_POOL.map((p) => `<button class="prime-btn" data-prime="${p}"><span class="num">${p}</span><kbd>${keyOf(p)}</kbd></button>`).join("");
 
 //変数
-type Rec = { n: number; factors: number[]; d: number; ms: number; miss: number; pts: number; perfect: boolean };
+type Rec = {
+  no: number;
+  n: number;
+  factors: number[];
+  d: number;
+  ms: number;
+  miss: number;
+  perfect: boolean;
+  base: number; // 基礎点（コンボ・PERFECT 倍率を掛ける前の合計）
+  pts: number; // 実際に得た得点
+  done: boolean; // false = 時間切れで未完了
+};
+
 const solveLog: { n: number; d: number; ms: number; miss: number }[] = [];
 type Verdict = { v: number; state: "ok" | "ng" | "skip" };
 
@@ -93,6 +105,7 @@ const later = (ms: number, fn: () => void) => {
 };
 
 let target = 0;
+let curFactors: number[] = []; // 今の問題の正解（素因数分解）
 let entered: number[] = [];
 let committed = 0; // 仮決定済みの入力数
 
@@ -100,6 +113,7 @@ let qno = 0;
 let combo = 0;
 let comboShown = 0;
 let maxCombo = 0;
+let probBase = 0; // この問題の基礎点の合計
 let decides = 0; // この問題での決定回数
 let probPts = 0; // この問題で得た点
 let score = 0;
@@ -141,6 +155,8 @@ function expo(list: number[], html: boolean): string {
 
 function nextProblem() {
   const pb = generate(progress);
+  curFactors = [...pb.factors].sort((a, b) => a - b);
+  probBase = curFactors.reduce((s, p) => s + factorBase(p), 0);
   qno++;
   target = pb.n;
   curStage = pb.stage;
@@ -172,8 +188,15 @@ function render() {
   el.expoAll.innerHTML = `<span class="ltr">${expo(entered, true)}</span>`;
   el.err.hidden = true;
   el.score.textContent = score.toLocaleString();
-  el.history.innerHTML = history.map((r) => `<li class="ok"><span>${r.n} = ${expo(r.factors, true)}</span><span>+${r.pts.toLocaleString()} · ${(r.ms / 1000).toFixed(1)}s</span></li>`).join("");
-  el.diff.textContent = curDiff.toFixed(1);
+
+  const row = (r: Rec) =>
+    `<li><span class="h-no">${r.no}</span><span class="h-n">${r.n}</span>` + `<span class="h-d">${r.d.toFixed(2)}</span><span class="h-s">${r.perfect ? "★" : ""}</span>` + `<span class="h-p">+${r.pts.toLocaleString()}</span><span class="h-t">${(r.ms / 1000).toFixed(1)}s</span></li>`;
+  // 最上段: 解いている途中の問題と途中得点
+  const curRow = running ? `<li class="cur"><span class="h-no">${qno}</span><span class="h-n">${target}</span>` + `<span class="h-d">${curDiff.toFixed(2)}</span><span class="h-s"></span>` + `<span class="h-p">+${probPts.toLocaleString()}</span><span class="h-t">…</span></li>` : "";
+
+  el.history.innerHTML = curRow + history.map(row).join("");
+
+  el.diff.textContent = curDiff.toFixed(2);
   el.range.textContent = `${curStage.dMin.toFixed(1)} – ${curStage.dMax.toFixed(1)}`;
 
   const st = summarize(history);
@@ -311,7 +334,18 @@ function playTrial(vs: Verdict[]) {
 
 function finish(perfect: boolean) {
   const ms = Math.round(performance.now() - startedAt);
-  const rec: Rec = { n: target, factors: [...entered], d: curDiff, ms, miss, pts: probPts, perfect };
+  const rec: Rec = {
+    no: qno,
+    n: target,
+    factors: [...entered],
+    d: curDiff,
+    ms,
+    miss,
+    perfect,
+    base: probBase,
+    pts: probPts,
+    done: true
+  };
   history.unshift(rec);
   solveLog.push(rec);
   progress += progressOf(curDiff);
@@ -491,6 +525,37 @@ function endGame() {
     ["ハイスコア", Math.max(prev, score).toLocaleString() + (isNew ? "  NEW" : "")]
   ];
   $("final-detail").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+  const list: Rec[] = [...history];
+  list.unshift({
+    no: qno,
+    n: target,
+    factors: curFactors,
+    d: curDiff,
+    ms: Math.round(performance.now() - startedAt),
+    miss,
+    perfect: false,
+    base: probBase,
+    pts: probPts,
+    done: false
+  });
+
+  const ans = (r: Rec) => `= ${expo(r.factors, true)}`;
+  $("final-list").innerHTML = list
+    .map(
+      (r) => `
+  <li class="rd">
+    <div class="rd-main">
+      <span class="rd-no">Q${r.no}</span><b>${r.n}</b><span class="rd-ans">${ans(r)}</span>
+      <span class="rd-d">難易度 ${r.d.toFixed(2)}</span>
+    </div>
+    <div class="rd-sub">
+      <span class="${r.perfect ? "pf" : ""}">${r.done ? (r.perfect ? "PERFECT" : "") : "未完了"}</span>
+      <span>${r.perfect ? "" : `MISS ${r.miss}`}</span>
+      <span>${(r.ms / 1000).toFixed(2)}s</span>
+    </div>
+  <div class="rd-pts">${`基礎点 ${r.base.toLocaleString()} <i>(×${r.base ? (r.pts / r.base).toFixed(2) : "-"})</i> → <b>+${r.pts.toLocaleString()}</b>`}</div>  </li>`
+    )
+    .join("");
   $("result").hidden = false;
 }
 
@@ -516,7 +581,7 @@ const mq = matchMedia("(max-width: 700px)");
 // ちらつかないよう、入る閾値(48)と戻る閾値(4)を離している）
 function updateBar() {
   const on = bar.classList.contains("compact");
-  bar.classList.toggle("compact", mq.matches || (on ? scrollY > 4 : scrollY > 48));
+  bar.classList.toggle("compact", mq.matches || (on ? scrollY > 16 : scrollY > 64));
 }
 addEventListener("scroll", updateBar, { passive: true });
 mq.addEventListener("change", updateBar);
