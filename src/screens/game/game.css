@@ -1,0 +1,54 @@
+.countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 2; /* .problem（sticky）が基準 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--panel);
+  border-radius: inherit; /* 3・2・1 の間は問題を隠す */
+}
+.countdown[hidden] {
+  display: none;
+}
+.countdown.go {
+  background: transparent;
+  pointer-events: none;
+}
+.go-banner {
+  color: var(--ok);
+  font-size: 18px;
+}
+.go-banner.show {
+  animation-duration: 0.9s;
+}
+#count-num {
+  font-size: clamp(36px, 10vw, 64px);
+  font-weight: 900;
+  line-height: 1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+#count-num.pop {
+  animation: count-pop 0.8s ease-out;
+}
+.countdown.go #count-num {
+  animation-duration: 0.5s;
+} /* GO! は短くして問題と重なる時間を減らす */
+@keyframes count-pop {
+  0% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}

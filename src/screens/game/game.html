@@ -1,0 +1,87 @@
+<div id="screen-game" hidden>
+  <div class="app">
+    <main class="game">
+      <header class="topbar">
+        <section class="panel stat">
+          <div class="label">残り時間</div>
+          <div id="timer" class="big">100<small>.000</small></div>
+        </section>
+        <section class="panel stat">
+          <div class="label">スコア</div>
+          <div id="score" class="big">0</div>
+          <div id="gain" class="gain"></div>
+        </section>
+      </header>
+      <section class="problem">
+        <div class="fx-row">
+          <div id="qno" class="qno">Q1</div>
+          <div id="perfect" class="perfect-banner">PERFECT!</div>
+          <div id="go" class="perfect-banner go-banner">GO!</div>
+          <div id="combo" class="combo" hidden></div>
+        </div>
+        <div id="target" class="target"></div>
+        <div class="originaltarget"><span id="originaltarget"></span></div>
+        <div id="countdown" class="countdown" hidden><span id="count-num"></span></div>
+      </section>
+
+      <section id="answer-sec" class="answer">
+        <div class="label">入力 <span id="err" class="err" hidden>ミス!</span></div>
+        <div class="row-wrap">
+          <div id="trial" class="trial"></div>
+          <div id="answer" class="answer-row"></div>
+        </div>
+        <div class="line" hidden>
+          <span class="tag">&gt;</span>
+          <div id="expo-input" class="expo"></div>
+        </div>
+        <div class="line">
+          <span class="tag">&gt;&gt;</span>
+          <div id="expo-all" class="expo"></div>
+        </div>
+      </section>
+
+      <section class="controls">
+        <div class="label">ボタンまたは数字+スペースで入力</div>
+        <div id="prime-buttons" class="prime-buttons"></div>
+        <div class="actions">
+          <button id="btn-divide" class="btn main">割る<kbd>Enter</kbd></button>
+          <button id="btn-undo" class="btn sub">1つ消す<kbd>Backspace</kbd></button>
+          <button id="btn-clear" class="btn sub">クリア<kbd>Esc</kbd></button>
+        </div>
+      </section>
+    </main>
+
+    <aside class="side">
+      <section class="panel">
+        <div class="label">難易度</div>
+        <div class="diff-row"><span>この問題</span><b id="diff">0.0</b></div>
+        <div class="diff-row"><span>Range</span><b id="range">0.0 – 0.0</b></div>
+        <div class="diff-row"><span>使用素数</span><b id="maxp">≤ 5</b></div>
+      </section>
+      <section class="panel">
+        <div class="label">統計</div>
+        <div class="diff-row"><span>正解</span><b id="st-solved">0</b></div>
+        <div class="diff-row"><span>ミス</span><b id="st-miss">0</b></div>
+        <div class="diff-row"><span>平均</span><b id="st-avg">-</b></div>
+        <div class="diff-row"><span>ハイスコア</span><b id="st-best">0</b></div>
+      </section>
+    </aside>
+    <aside class="hist">
+      <section class="panel history-panel">
+        <div class="history-head"><span>No</span><span>問題</span><span>難度</span><span></span><span>得点</span><span>時間</span></div>
+        <ul id="history" class="history"></ul>
+      </section>
+    </aside>
+  </div>
+  <div id="result" class="result" hidden>
+    <div class="result-box">
+      <div class="label">Result</div>
+      <div id="final-score" class="big"></div>
+      <dl id="final-detail" class="stats"></dl>
+      <div class="label detail-label">Details</div>
+      <ul id="final-list" class="rd-list"></ul>
+      <button id="btn-restart" class="btn main">もう一度<kbd>Enter</kbd></button>
+      <button id="btn-title" class="btn sub">タイトルへ</button>
+    </div>
+  </div>
+</div>

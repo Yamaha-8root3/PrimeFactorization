@@ -1,7 +1,7 @@
 {
   "name": "primefactorization",
   "private": true,
-  "version": "0.3.2",
+  "version": "0.3.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,5 +11,8 @@
   "devDependencies": {
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
+  },
+  "dependencies": {
+    "@types/node": "^26.6.4"
   }
 }

@@ -212,6 +212,9 @@ kbd {
   align-items: center;
   height: 28px;
 }
+.fx-row > * {
+  grid-row: 1;
+}
 
 .combo {
   justify-self: end;
@@ -225,7 +228,7 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 .perfect-banner {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 900;
   letter-spacing: 0.1em;
   color: var(--accent);
@@ -520,6 +523,7 @@ sub {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 12px;
 }
 .result[hidden] {
   display: none;
@@ -534,6 +538,14 @@ sub {
   display: flex;
   flex-direction: column;
   gap: 16px;
+
+  max-height: 100%; /* .result（position: fixed）の高さが上限 */
+  overflow-y: auto; /* 極端に小さい画面での保険 */
+  overscroll-behavior: contain;
+  min-width: 0;
+}
+.result-box > .btn {
+  flex: none;
 }
 .result-title {
   font-size: 12px;
@@ -600,12 +612,16 @@ sub {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 34dvh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 6px;
   text-align: left;
+
+  flex: 1 1 auto;
+  min-height: 6em;
+  max-height: none;
+  overscroll-behavior: contain;
 }
 .rd {
   background: var(--bg);
@@ -736,7 +752,7 @@ sub {
     flex-wrap: wrap;
   }
   .btn.main {
-    order: -1;
+    /* order: -1; */
     flex: 1 1 100%;
   }
 }
@@ -753,6 +769,9 @@ sub {
   align-items: center;
   gap: 8px;
   margin-top: 6px;
+}
+.line:has(#expo-input) {
+  display: none;
 }
 .tag {
   flex: none;

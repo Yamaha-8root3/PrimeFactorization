@@ -1,31 +1,15 @@
-import "./style.css";
+import "./game.css";
 import { generate, prod, progressOf, stageOf, PRIME_POOL, type Stage } from "./generator";
 import { factorPoints, factorBase } from "./score";
-import html from "./game.html?raw";
+import { loadBest, saveBest } from "../../shared/storage";
+import { $, press } from "../../shared/dom";
 
-//HTML構成
-declare const __APP_VERSION__: string;
-document.querySelector(".version")!.textContent = `v${__APP_VERSION__}`;
-document.querySelector<HTMLDivElement>("#game")!.innerHTML = html;
-const $ = (id: string) => document.getElementById(id)!;
-// main.ts — ボタンの click 登録（素数ボタン・各操作ボタン）を置き換え
-const press = (el: Element, fn: () => void) =>
-  el.addEventListener("pointerdown", (e) => {
-    e.preventDefault();
-    fn();
-  });
 press($("btn-divide"), divide);
 press($("btn-undo"), undo);
 press($("btn-clear"), clearInput);
-press($("btn-restart"), startGame);
+press($("btn-restart"), beginCountdown);
+press($("btn-title"), toTitle);
 
-const isUnlocked = (p: number) => p <= stageOf(progress).maxPrime;
-document.querySelectorAll<HTMLElement>(".prime-btn").forEach((b) =>
-  press(b, () => {
-    const p = Number(b.dataset.prime);
-    if (isUnlocked(p)) addPrime(p);
-  })
-);
 const el = {
   target: $("target"),
   originaltarget: $("originaltarget"),
@@ -74,7 +58,21 @@ const keyOf = (p: number) =>
     ?.toUpperCase() ?? "";
 $("prime-buttons").innerHTML = PRIME_POOL.map((p) => `<button class="prime-btn" data-prime="${p}"><span class="num">${p}</span><kbd>${keyOf(p)}</kbd></button>`).join("");
 
+const isUnlocked = (p: number) => p <= stageOf(progress).maxPrime;
+document.querySelectorAll<HTMLElement>(".prime-btn").forEach((b) =>
+  press(b, () => {
+    const p = Number(b.dataset.prime);
+    if (isUnlocked(p)) addPrime(p);
+  })
+);
+
 //変数
+type Phase = "idle" | "count" | "play" | "result"; // idle = ゲーム画面が非表示（タイトル中）
+let phase: Phase = "idle";
+let resultAt = 0;
+let onExit: () => void = () => {};
+const COUNT_STEP = 800;
+
 type Rec = {
   no: number;
   n: number;
@@ -91,10 +89,8 @@ type Rec = {
 const solveLog: { n: number; d: number; ms: number; miss: number }[] = [];
 type Verdict = { v: number; state: "ok" | "ng" | "skip" };
 
-const SCORE_VERSION = 1.1;
-
 const TIME_LIMIT = 100_000; // ms
-let running = false;
+const playing = () => phase === "play";
 let gameStart = 0;
 let gameId = 0;
 const later = (ms: number, fn: () => void) => {
@@ -103,6 +99,7 @@ const later = (ms: number, fn: () => void) => {
     if (id === gameId) fn();
   }, ms);
 };
+let bestScore = loadBest();
 
 let target = 0;
 let curFactors: number[] = []; // 今の問題の正解（素因数分解）
@@ -192,7 +189,7 @@ function render() {
   const row = (r: Rec) =>
     `<li><span class="h-no">${r.no}</span><span class="h-n">${r.n}</span>` + `<span class="h-d">${r.d.toFixed(2)}</span><span class="h-s">${r.perfect ? "★" : ""}</span>` + `<span class="h-p">+${r.pts.toLocaleString()}</span><span class="h-t">${(r.ms / 1000).toFixed(1)}s</span></li>`;
   // 最上段: 解いている途中の問題と途中得点
-  const curRow = running ? `<li class="cur"><span class="h-no">${qno}</span><span class="h-n">${target}</span>` + `<span class="h-d">${curDiff.toFixed(2)}</span><span class="h-s"></span>` + `<span class="h-p">+${probPts.toLocaleString()}</span><span class="h-t">…</span></li>` : "";
+  const curRow = playing() ? `<li class="cur"><span class="h-no">${qno}</span><span class="h-n">${target}</span>` + `<span class="h-d">${curDiff.toFixed(2)}</span><span class="h-s"></span>` + `<span class="h-p">+${probPts.toLocaleString()}</span><span class="h-t">…</span></li>` : "";
 
   el.history.innerHTML = curRow + history.map(row).join("");
 
@@ -233,21 +230,21 @@ function commitBuf() {
 }
 
 function addPrime(p: number) {
-  if (!running) return;
+  if (!playing()) return;
   entered.push(p);
   if (AUTO_FINISH && prod(entered) === target) finish(false);
   else render();
 }
 
 function clearInput() {
-  if (!running) return;
+  if (!playing()) return;
   entered.length = committed;
   buf = "";
   render();
 }
 
 function undo() {
-  if (!running) return;
+  if (!playing()) return;
   if (entered.length > committed) {
     entered.pop();
     render();
@@ -255,7 +252,7 @@ function undo() {
 }
 
 function divide() {
-  if (!running) return;
+  if (!playing()) return;
   commitBuf();
   const pending = entered.slice(committed);
   if (!pending.length) return;
@@ -302,7 +299,7 @@ function divide() {
   }
   score += gained;
   probPts += gained;
-  if (perfect) showPerfect();
+  if (perfect) showBanner("perfect");
 
   entered.length = committed + okCount;
   committed = entered.length;
@@ -412,11 +409,10 @@ function breakCombo() {
     { once: true }
   );
 }
-
-function showPerfect() {
-  const b = $("perfect");
+function showBanner(id: "perfect" | "go") {
+  const b = $(id);
   b.classList.remove("show");
-  void b.offsetWidth;
+  void b.offsetWidth; // アニメーション再始動
   b.classList.add("show");
 }
 
@@ -433,30 +429,18 @@ function summarize(recs: Rec[]) {
     perfects: recs.filter((r) => r.perfect).length
   };
 }
-const HS_KEY = `pf${SCORE_VERSION}.best`;
-const loadBest = () => {
-  try {
-    return Number(localStorage.getItem(HS_KEY)) || 0;
-  } catch {
-    return 0;
-  }
-};
-let bestScore = loadBest();
-const saveBest = (v: number) => {
-  try {
-    localStorage.setItem(HS_KEY, String(v));
-  } catch {}
-};
-
-document.querySelectorAll<HTMLElement>(".prime-btn").forEach((b) => b.addEventListener("click", () => addPrime(Number(b.dataset.prime))));
 
 document.addEventListener("keydown", (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === "Enter") {
+    if (phase === "idle") return; // タイトル画面の Enter は title.ts が処理
     e.preventDefault();
-    return running ? divide() : startGame();
+    if (phase === "play") return divide();
+    // 時間切れ直後の連打で、リザルトを飛ばして再開しないようにする
+    if (phase === "result" && performance.now() - resultAt >= 800) return beginCountdown();
+    return;
   }
-  if (!running) return;
+  if (!playing()) return;
   if (/^[0-9]$/.test(e.key)) return typeDigit(e.key);
   if (e.key === " ") {
     e.preventDefault();
@@ -478,11 +462,44 @@ $("trial").replaceChildren();
 window.addEventListener("resize", render);
 
 setInterval(tick, 16);
-// startGame(); // 初回は自動開始
 
 // --------------------------
 
+function beginCountdown() {
+  if (phase === "count" || phase === "play") return;
+  phase = "count";
+  $("screen-game").hidden = false;
+  $("result").hidden = true;
+  resetGame();
+
+  const box = $("countdown"),
+    num = $("count-num");
+  box.hidden = false;
+  ["3", "2", "1", "GO!"].forEach((t, i) =>
+    later(i * COUNT_STEP, () => {
+      if (t === "GO!") {
+        box.hidden = true; // 3・2・1 の表示を消して問題を見せる
+        startGame(); // ここで計測開始
+        showBanner("go"); // PERFECT と同じ位置に GO! を表示
+        return;
+      }
+      num.textContent = t;
+      num.classList.remove("pop");
+      void num.offsetWidth; // アニメーション再始動
+      num.classList.add("pop");
+    })
+  );
+}
 function startGame() {
+  phase = "play";
+  gameStart = performance.now();
+  $("result").hidden = true;
+  nextProblem();
+}
+
+//カウントダウン時に行うinit
+function resetGame() {
+  gameId++; // 前のゲームの予約（ポップなど）を無効化。later はこの後に予約すること
   qno = 0;
   score = 0;
   miss = 0;
@@ -490,23 +507,32 @@ function startGame() {
   combo = 0;
   maxCombo = 0;
   history.length = 0; // solveLog は校正用に保持
-
-  gameId++;
+  target = 0;
+  entered = [];
+  committed = 0;
+  buf = "";
+  decides = 0;
+  probPts = 0;
+  probBase = 0;
+  curDiff = 0;
+  curStage = stageOf(0);
   scoreShown = scoreFrom = scoreTo = 0;
   el.score.textContent = "0";
   comboShown = 0;
   $("combo").hidden = true;
-  running = true;
-  gameStart = performance.now();
-  $("result").hidden = true;
   clearTimeout(gainTimer);
   gainAcc = 0;
   $("gain").classList.remove("on", "bump");
-  nextProblem();
+  el.trial.replaceChildren();
+  queueEndAt = 0;
+  const [sec, frac] = (TIME_LIMIT / 1000).toFixed(3).split(".");
+  el.timer.innerHTML = `${sec}<small>.${frac}</small>`;
+  render();
 }
 
 function endGame() {
-  running = false;
+  phase = "result";
+  resultAt = performance.now();
   const s = summarize(history);
   const prev = loadBest();
   const isNew = score > prev;
@@ -561,7 +587,7 @@ function endGame() {
 
 // main.ts — tick を置き換え（残り時間表示。問題ごとの経過は startedAt で別管理のまま）
 function tick() {
-  if (!running) return;
+  if (!playing()) return;
   const left = Math.max(0, TIME_LIMIT - (performance.now() - gameStart));
   // const m = Math.floor(left / 60000);
   // const s = ((left % 60000) / 1000).toFixed(1).padStart(4, "0");
@@ -589,3 +615,17 @@ mq.addEventListener("change", updateBar);
 // トップバーの実際の高さを CSS 変数に渡す（問題パネルの sticky の位置に使用）
 new ResizeObserver(() => document.documentElement.style.setProperty("--bar-h", `${bar.offsetHeight}px`)).observe(bar);
 updateBar();
+
+export function initGame(opt: { onExit: () => void }) {
+  onExit = opt.onExit;
+  return { start: beginCountdown };
+}
+
+function toTitle() {
+  phase = "idle";
+  gameId++;
+  $("result").hidden = true;
+  $("countdown").hidden = true;
+  $("screen-game").hidden = true;
+  onExit();
+}
