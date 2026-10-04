@@ -1,0 +1,56 @@
+.title-screen .account {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.title-screen .account .btn {
+  width: auto;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+.auth-dialog {
+  width: min(92vw, 320px);
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+}
+.auth-dialog::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+.auth-dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.auth-dialog h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.auth-dialog label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.auth-dialog input {
+  height: 36px;
+  padding: 0 10px;
+  font-size: 16px; /* 16px は iOS の自動ズーム防止 */
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+.auth-error {
+  min-height: 1.2em;
+  color: var(--ng);
+  font-size: 12px;
+}
+.auth-dialog .btn {
+  flex: none;
+  width: 100%;
+}

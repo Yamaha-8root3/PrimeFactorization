@@ -6,6 +6,7 @@ export function initTitle(opt: { onStart: () => void }) {
   const root = $("screen-title");
   press($("btn-start"), opt.onStart);
   addEventListener("keydown", (e) => {
+    if (document.querySelector("dialog[open]")) return;
     if (e.key === "Enter" && !root.hidden) {
       e.preventDefault();
       opt.onStart();

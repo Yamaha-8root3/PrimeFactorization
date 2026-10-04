@@ -2,6 +2,7 @@ import { defineConfig, type Plugin } from "vite";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import pkg from "./package.json" with { type: "json" };
+import { cloudflare } from "@cloudflare/vite-plugin";
 
 function htmlInclude(): Plugin {
   return {
@@ -17,4 +18,4 @@ function htmlInclude(): Plugin {
   };
 }
 
-export default defineConfig({ base: "./", define: { __APP_VERSION__: JSON.stringify(pkg.version) }, plugins: [htmlInclude()] });
+export default defineConfig({ base: "./", build: { outDir: "dist", emptyOutDir: true }, define: { __APP_VERSION__: JSON.stringify(pkg.version) }, plugins: [htmlInclude(), cloudflare()] });

@@ -18,6 +18,9 @@
     --border: #2f3547;
   }
 }
+[hidden] {
+  display: none !important;
+}
 
 /* ベース */
 .version {

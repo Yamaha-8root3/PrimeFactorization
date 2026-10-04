@@ -2,11 +2,37 @@
   <h1 class="title">PRIME</h1>
   <div class="title-sub">SPEED PRIME FACTORIZATION</div>
 
-  <div class="title-best">ハイスコア <b id="title-best">0</b></div>
+  <div class="account">
+    <span id="account-name"></span>
+    <button id="btn-account" class="btn sub">ログイン / 新規登録</button>
+    <button id="btn-logout" class="btn sub" hidden>ログアウト</button>
+  </div>
+
   <button id="btn-start" class="btn main">Start<kbd>Enter</kbd></button>
+  <div class="title-best">ハイスコア <b id="title-best">0</b></div>
   <ul class="howto">
     <li>素数ボタン / キー: 素因数を入力</li>
     <li>数字キー + Space: 数値を入力して確定</li>
     <li>Enter: 割る　Backspace: 1つ消す　Esc: クリア</li>
   </ul>
 </main>
+
+<dialog id="auth-dialog" class="auth-dialog">
+  <form id="auth-form">
+    <h2 id="auth-title">ログイン</h2>
+    <label>ユーザー名<input id="auth-user" autocomplete="username" maxlength="16" required /></label>
+    <label>パスワード<input id="auth-pass" type="password" autocomplete="current-password" minlength="8" maxlength="128" required /></label>
+    <label id="auth-display-wrap" hidden
+      >表示名（省略するとユーザー名）
+      <input id="auth-display" maxlength="16" />
+      招待コード<br />
+      <input id="auth-invite" maxlength="16" />
+      メールアドレスなしアカウントの 作成には招待コードが必要です。<br />
+      メールでののサインインは現在利用できません。
+    </label>
+    <div id="auth-error" class="auth-error"></div>
+    <button id="auth-submit" class="btn main" type="submit">ログイン</button>
+    <button id="auth-switch" class="btn sub" type="button">アカウントを作成する</button>
+    <button id="auth-close" class="btn sub" type="button">閉じる</button>
+  </form>
+</dialog>
