@@ -1,6 +1,6 @@
 PLAY NOW!!
 
-[Prime Factrization](https://yamaha-8root3.github.io/PrimeFactorization/)
+[Prime Factrization](https://prime.yamaha8root3.workers.dev/)
 
 ## CHANGELOG
 
