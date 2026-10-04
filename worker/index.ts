@@ -1,6 +1,7 @@
-import { DurableObject } from 'cloudflare:workers';
-import { json, corsHeaders, type Handler } from './http';
-import * as auth from './routes/auth';
+import { DurableObject } from "cloudflare:workers";
+import { json, corsHeaders, type Handler } from "./http";
+import * as auth from "./routes/auth";
+import * as ranking from "./routes/ranking";
 /**
  * Welcome to Cloudflare Workers! This is your first Durable Objects application.
  *
@@ -40,26 +41,29 @@ export class MyDurableObject extends DurableObject<Env> {
 }
 
 const routes: Record<string, Handler> = {
-  'POST /api/signup': auth.signup,
-  'POST /api/login': auth.login,
-  'POST /api/logout': auth.logout,
-  'GET /api/me': auth.me,
-  'POST /api/password': auth.changePassword,
+  "POST /api/signup": auth.signup,
+  "POST /api/login": auth.login,
+  "POST /api/logout": auth.logout,
+  "GET /api/me": auth.me,
+  "POST /api/password": auth.changePassword,
+  "POST /api/score": ranking.submit,
+  "GET /api/ranking": ranking.list,
+  "GET /api/best": ranking.best
 };
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const cors = corsHeaders(req, env);
-    if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+    if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
     const handler = routes[`${req.method} ${new URL(req.url).pathname}`];
     let res: Response;
     try {
-      res = handler ? await handler(req, env) : json({ error: 'not_found' }, 404);
+      res = handler ? await handler(req, env) : json({ error: "not_found" }, 404);
     } catch (e) {
       console.error(e);
-      res = json({ error: 'server_error' }, 500);
+      res = json({ error: "server_error" }, 500);
     }
     for (const [k, v] of Object.entries(cors)) res.headers.set(k, v);
     return res;
-  },
+  }
 } satisfies ExportedHandler<Env>;

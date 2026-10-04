@@ -1,0 +1,12 @@
+.auth-dialog .cfg-row {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
+}
+.auth-dialog .cfg-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}

@@ -52,3 +52,32 @@
     transform: scale(0.9);
   }
 }
+
+/* game.css（前回の #btn-abort { ... } を削除して置き換え） */
+.abort-mini {
+  position: absolute; /* .stat が position: relative */
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+}
+.abort-mini.armed {
+  color: var(--ng);
+  border-color: var(--ng);
+}
+/* ボタンの分だけ左に余白（compact 時の padding 指定に負けないよう両方書く） */
+.topbar .stat.has-abort,
+.topbar.compact .stat.has-abort {
+  padding-left: 40px;
+}

@@ -1,7 +1,18 @@
+import { RunResult } from "./rules";
+
 const BASE: string = import.meta.env.DEV ? "http://localhost:8787" : "";
 const TOKEN_KEY = "pf.token";
+export const RULES_VER = 1;
 
 export type User = { id: number; username: string; displayName: string; role: string };
+export type RankEntry = { rank: number; displayName: string; score: number; solved: number; mine: boolean };
+export type RankMe = { rank: number; score: number; solved: number };
+
+const rankCache = new Map<string, { t: number; data: { entries: RankEntry[]; me: RankMe | null } }>();
+const RANK_TTL = 30_000;
+export const clearRankCache = (mode?: string) => {
+  for (const k of rankCache.keys()) if (!mode || k.startsWith(`${mode}:`)) rankCache.delete(k);
+};
 
 const getToken = () => {
   try {
@@ -60,4 +71,28 @@ export async function changePassword(current: string, next: string) {
     return {};
   } // 全端末のセッションが破棄されるため、新しいトークンに差し替える
   return { error: r.data.error ?? "network" };
+}
+
+export async function submitScore(result: RunResult) {
+  const r = await call<{ best: number; isBest: boolean }>("/api/score", {
+    method: "POST",
+    body: JSON.stringify(result)
+  });
+  if (r.ok) clearRankCache(result.mode);
+  return r.ok ? r.data : { error: r.data.error ?? "network" };
+}
+
+export async function fetchRanking(mode: string, limit = 20) {
+  const k = `${mode}:${limit}`;
+  const hit = rankCache.get(k);
+  if (hit && Date.now() - hit.t < RANK_TTL) return hit.data;
+  const r = await call<{ entries: RankEntry[]; me: RankMe | null }>(`/api/ranking?mode=${encodeURIComponent(mode)}&limit=${limit}`);
+  if (!r.ok) return { error: r.data.error ?? "network" };
+  rankCache.set(k, { t: Date.now(), data: r.data });
+  console.log(r.data);
+  return r.data;
+}
+export async function fetchBests() {
+  const r = await call<{ bests: Record<string, number> }>("/api/best");
+  return r.ok ? r.data : { error: r.data.error ?? "network" };
 }

@@ -3,12 +3,16 @@ import { generate, prod, progressOf, stageOf, PRIME_POOL, type Stage } from "./g
 import { factorPoints, factorBase } from "./score";
 import { loadBest, saveBest } from "../../shared/storage";
 import { $, press } from "../../shared/dom";
+import { submitScore } from "../../shared/api";
+import { currentUser } from "../title/account";
+import { RULESETS, DEFAULT_ID, DEFAULT_RULES, type Decision, type ProblemLog, type RunResult, makeSetup, type GameSetup, RuleSet } from "../../shared/rules";
 
 press($("btn-divide"), divide);
 press($("btn-undo"), undo);
 press($("btn-clear"), clearInput);
 press($("btn-restart"), beginCountdown);
 press($("btn-title"), toTitle);
+press($("btn-abort"), abortRun);
 
 const el = {
   target: $("target"),
@@ -67,6 +71,10 @@ document.querySelectorAll<HTMLElement>(".prime-btn").forEach((b) =>
 );
 
 //変数
+
+let setup: GameSetup = makeSetup(DEFAULT_ID);
+let TIME_LIMIT = setup.ruleset.rules.limitMs;
+
 type Phase = "idle" | "count" | "play" | "result"; // idle = ゲーム画面が非表示（タイトル中）
 let phase: Phase = "idle";
 let resultAt = 0;
@@ -87,9 +95,10 @@ type Rec = {
 };
 
 const solveLog: { n: number; d: number; ms: number; miss: number }[] = [];
+const runLog: ProblemLog[] = [];
+let curDec: Decision[] = [];
 type Verdict = { v: number; state: "ok" | "ng" | "skip" };
 
-const TIME_LIMIT = 100_000; // ms
 const playing = () => phase === "play";
 let gameStart = 0;
 let gameId = 0;
@@ -99,7 +108,7 @@ const later = (ms: number, fn: () => void) => {
     if (id === gameId) fn();
   }, ms);
 };
-let bestScore = loadBest();
+let bestScore = 0;
 
 let target = 0;
 let curFactors: number[] = []; // 今の問題の正解（素因数分解）
@@ -142,6 +151,26 @@ let scoreShown = 0,
 //キーボード入力
 const BUF_MAX = 6;
 let buf = "";
+
+let abortTimer = 0;
+// 2回押しで中断。記録・送信はせずタイトルへ戻る
+function abortRun() {
+  if (phase !== "play" && phase !== "count") return;
+  if (!abortTimer) {
+    $("btn-abort").textContent = "中断?";
+    $("btn-abort").classList.add("armed");
+    abortTimer = window.setTimeout(disarmAbort, 2000);
+    return;
+  }
+  disarmAbort();
+  toTitle();
+}
+function disarmAbort() {
+  clearTimeout(abortTimer);
+  abortTimer = 0;
+  $("btn-abort").textContent = "✕";
+  $("btn-abort").classList.remove("armed");
+}
 
 //素因数分解の整形テキスト生成
 function expo(list: number[], html: boolean): string {
@@ -467,11 +496,15 @@ setInterval(tick, 16);
 
 function beginCountdown() {
   if (phase === "count" || phase === "play") return;
+  TIME_LIMIT = setup.ruleset.rules.limitMs;
   phase = "count";
   $("screen-game").hidden = false;
   $("result").hidden = true;
   resetGame();
-
+  if (!setup.config.showCountdown) {
+    startGame(); // ここで計測開始
+    return;
+  }
   const box = $("countdown"),
     num = $("count-num");
   box.hidden = false;
@@ -527,6 +560,10 @@ function resetGame() {
   queueEndAt = 0;
   const [sec, frac] = (TIME_LIMIT / 1000).toFixed(3).split(".");
   el.timer.innerHTML = `${sec}<small>.${frac}</small>`;
+
+  loadBest(setup.ruleset.id);
+
+  disarmAbort();
   render();
 }
 
@@ -534,9 +571,9 @@ function endGame() {
   phase = "result";
   resultAt = performance.now();
   const s = summarize(history);
-  const prev = loadBest();
+  const prev = loadBest(setup.ruleset.id);
   const isNew = score > prev;
-  if (isNew) saveBest(score);
+  if (isNew) saveBest(setup.ruleset.id, score);
   bestScore = Math.max(prev, score);
   $("final-score").textContent = score.toLocaleString();
   const rows: [string, string][] = [
@@ -583,6 +620,14 @@ function endGame() {
     )
     .join("");
   $("result").hidden = false;
+  const result = buildResult();
+  console.log(result);
+  if (currentUser && setup.ruleset.ranked) submitScore(result);
+}
+function buildResult(): RunResult {
+  const problems = [...runLog];
+  if (curDec.length) problems.push({ n: target, dec: curDec });
+  return { mode: setup.ruleset.id, rulesVer: setup.ruleset.ver, seed: setup.seed, score, solved: history.length, problems };
 }
 
 // main.ts — tick を置き換え（残り時間表示。問題ごとの経過は startedAt で別管理のまま）
@@ -618,7 +663,13 @@ updateBar();
 
 export function initGame(opt: { onExit: () => void }) {
   onExit = opt.onExit;
-  return { start: beginCountdown };
+  return { start: initRules };
+}
+
+function initRules(rule?: GameSetup) {
+  // console.log(rule);
+  setup = rule || makeSetup(DEFAULT_ID);
+  beginCountdown();
 }
 
 function toTitle() {

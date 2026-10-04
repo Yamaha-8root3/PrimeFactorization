@@ -1,0 +1,84 @@
+/* src/screens/title/rank.css */
+.rank-dialog {
+  width: min(92vw, 360px);
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+}
+.rank-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rank-dialog::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+.rank-dialog h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.rank-dialog select {
+  height: 36px;
+  padding: 0 10px;
+  font-size: 16px; /* iOS の自動ズーム防止 */
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+.rank-dialog .btn {
+  flex: none;
+  width: 100%;
+}
+
+.rank-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50dvh;
+  overflow-y: auto;
+}
+.rank-list li {
+  display: grid;
+  grid-template-columns: 2.5em minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+.rank-list li:last-child {
+  border-bottom: 0;
+}
+.rank-list li span:first-child {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.rank-list li:nth-child(-n + 3) span:first-child {
+  color: var(--text);
+  font-weight: 700;
+}
+.rank-list li span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rank-list li span:last-child {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+.rank-list li.mine {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  font-weight: 700;
+}
+
+.rank-me {
+  min-height: 1.2em;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}

@@ -8,8 +8,12 @@
     <button id="btn-logout" class="btn sub" hidden>ログアウト</button>
   </div>
 
+  <select id="ruleset-select" class="btn sub"></select>
+  <button id="btn-config" class="btn sub">設定</button>
   <button id="btn-start" class="btn main">Start<kbd>Enter</kbd></button>
   <div class="title-best">ハイスコア <b id="title-best">0</b></div>
+  <button id="btn-ranking" class="btn sub">ランキング</button>
+
   <ul class="howto">
     <li>素数ボタン / キー: 素因数を入力</li>
     <li>数字キー + Space: 数値を入力して確定</li>
@@ -21,18 +25,34 @@
   <form id="auth-form">
     <h2 id="auth-title">ログイン</h2>
     <label>ユーザー名<input id="auth-user" autocomplete="username" maxlength="16" required /></label>
-    <label>パスワード<input id="auth-pass" type="password" autocomplete="current-password" minlength="8" maxlength="128" required /></label>
+    <label>パスワード<input id="auth-pass" type="password" autocomplete="current-password" minlength="5" maxlength="128" required /></label>
     <label id="auth-display-wrap" hidden
       >表示名（省略するとユーザー名）
       <input id="auth-display" maxlength="16" />
-      招待コード<br />
+      <!-- 招待コード<br />
       <input id="auth-invite" maxlength="16" />
       メールアドレスなしアカウントの 作成には招待コードが必要です。<br />
-      メールでののサインインは現在利用できません。
+      メールでののサインインは現在利用できません。 -->
     </label>
     <div id="auth-error" class="auth-error"></div>
     <button id="auth-submit" class="btn main" type="submit">ログイン</button>
     <button id="auth-switch" class="btn sub" type="button">アカウントを作成する</button>
     <button id="auth-close" class="btn sub" type="button">閉じる</button>
+  </form>
+</dialog>
+
+<dialog id="rank-dialog" class="rank-dialog">
+  <h2>ランキング</h2>
+  <ol id="rank-list" class="rank-list"></ol>
+  <div id="rank-me"></div>
+  <div id="rank-error" class="auth-error"></div>
+  <button id="rank-close" class="btn sub" type="button">閉じる</button>
+</dialog>
+
+<dialog id="config-dialog" class="auth-dialog">
+  <form method="dialog">
+    <h2>設定</h2>
+    <label class="cfg-row"><input id="cfg-countdown" type="checkbox" />開始時のカウントダウンを表示</label>
+    <button class="btn main">閉じる</button>
   </form>
 </dialog>

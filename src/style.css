@@ -78,7 +78,7 @@ kbd {
 /* レイアウト */
 .topbar,
 .app {
-  max-width: 1100px;
+  max-width: 70%;
   margin: 0 auto;
   padding: 16px;
 }
@@ -373,12 +373,12 @@ kbd {
 }
 .prime-buttons {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
   gap: 8px;
 }
 .prime-btn {
   position: relative;
-  height: 52px;
+  height: 64px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--bg);

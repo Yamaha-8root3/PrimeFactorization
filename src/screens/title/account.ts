@@ -1,10 +1,11 @@
 import "./auth.css";
 import { $ } from "../../shared/dom";
 import { signup, login, logout, fetchMe, type User } from "../../shared/api";
+import { syncBest } from "../../shared/storage";
 
 const ERRORS: Record<string, string> = {
   invalid_username: "ユーザー名は英数字と _ の 3〜16 文字です",
-  invalid_password: "パスワードは 8〜128 文字です",
+  invalid_password: "パスワードは 5〜128 文字です",
   username_taken: "このユーザー名は使われています",
   invalid_credentials: "ユーザー名またはパスワードが違います",
   network: "通信に失敗しました",
@@ -51,6 +52,7 @@ export function initAccount() {
     await logout();
     currentUser = null;
     refresh();
+    syncBest(null);
   });
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -60,6 +62,7 @@ export function initAccount() {
       pass.value = "";
       dlg.close();
       refresh();
+      syncBest(currentUser.id);
     } else $("auth-error").textContent = ERRORS[r.error ?? ""] ?? "エラーが発生しました";
   });
 
@@ -67,5 +70,6 @@ export function initAccount() {
   fetchMe().then((u) => {
     currentUser = u;
     refresh();
+    syncBest(u?.id ?? null);
   });
 }
