@@ -78,7 +78,7 @@ kbd {
 /* レイアウト */
 .topbar,
 .app {
-  max-width: 70%;
+  max-width: 1200px;
   margin: 0 auto;
   padding: 16px;
 }
@@ -371,6 +371,9 @@ kbd {
   -webkit-touch-callout: none;
   touch-action: none;
 }
+.btn:disabled {
+  opacity: 0.4;
+}
 .prime-buttons {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
@@ -526,26 +529,51 @@ sub {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  padding: 16px;
 }
 .result[hidden] {
   display: none;
 }
 .result-box {
-  width: min(92vw, 420);
+  width: min(1000px, 100%);
+  height: min(100%, 720px);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 24px;
+  padding: 20px;
   text-align: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  grid-template-rows: 1fr auto;
+  grid-template-areas: "main detail" "btns detail";
+  gap: 16px 20px;
+  min-width: 0;
+}
+.rb-main {
+  grid-area: main;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-
-  max-height: 100%; /* .result（position: fixed）の高さが上限 */
-  overflow-y: auto; /* 極端に小さい画面での保険 */
-  overscroll-behavior: contain;
-  min-width: 0;
+  gap: 5px;
+  min-height: 0;
+  overflow-y: auto;
+}
+.rb-scroll {
+  display: contents;
+}
+.rb-detail {
+  grid-area: detail;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.rb-btns {
+  grid-area: btns;
+  display: flex;
+  gap: 8px;
+}
+.rd-list {
+  flex: 1 1 0;
+  min-height: 0;
 }
 .result-box > .btn {
   flex: none;
@@ -678,6 +706,75 @@ sub {
   line-height: 0;
 }
 
+.rs-head {
+  text-align: center;
+}
+.rs-score {
+  font-size: 2.4rem;
+  font-weight: 700;
+}
+.rs-prev {
+  display: flex;
+  gap: 0.6em;
+  justify-content: center;
+  font-size: 0.85rem;
+}
+.rs-new {
+  color: #fc0;
+  font-weight: 700;
+}
+.rs-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 6px;
+  margin: 8px 0;
+}
+.rt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px;
+  border: 1px solid #8884;
+  border-radius: 6px;
+}
+.rt b {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+.rt span {
+  font-size: 1.2rem;
+}
+.rt i {
+  font-size: 0.7rem;
+  opacity: 0.7;
+  font-style: normal;
+}
+.rs-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: #8883;
+}
+.rs-bar u {
+  display: block;
+}
+.rs-bar .ok {
+  background: #4c8;
+}
+.rs-bar .ng {
+  background: #e55;
+}
+.rs-bar .sk {
+  background: #999;
+}
+.rs-accrow {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  margin-top: 3px;
+}
+
 /* レスポンシブ: 中間幅（2列、履歴は下段） */
 @media (max-width: 1000px) {
   .app {
@@ -757,6 +854,67 @@ sub {
   .btn.main {
     /* order: -1; */
     flex: 1 1 100%;
+  }
+  .result {
+    padding: 5px;
+  }
+  .result-box {
+    height: 95%;
+    width: 95%;
+    border-radius: 8px;
+    padding: 12px;
+    gap: 10px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "body" "btns";
+  }
+  .rb-scroll {
+    grid-area: body;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .rb-main {
+    overflow: visible;
+    flex: none;
+    gap: 5px;
+  }
+  .rb-detail {
+    flex: none;
+  }
+  .rd-list {
+    flex: none;
+    overflow: visible;
+    min-height: 0;
+  }
+  .rb-btns .btn,
+  .rb-btns .btn.main {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  .rs-score {
+    font-size: 2rem;
+  }
+  .rs-prev {
+    flex-wrap: wrap;
+  }
+  .rs-tiles {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+  }
+  .rt {
+    padding: 4px;
+  }
+  .rt span {
+    font-size: 1rem;
+  }
+  .rs-accrow {
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    font-size: 0.72rem;
   }
 }
 

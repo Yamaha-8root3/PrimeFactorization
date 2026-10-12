@@ -48,7 +48,8 @@ const routes: Record<string, Handler> = {
   "POST /api/password": auth.changePassword,
   "POST /api/score": ranking.submit,
   "GET /api/ranking": ranking.list,
-  "GET /api/best": ranking.best
+  "GET /api/best": ranking.best,
+  "POST /api/play/start": ranking.startPlay
 };
 
 export default {

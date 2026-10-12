@@ -81,3 +81,28 @@
 .topbar.compact .stat.has-abort {
   padding-left: 40px;
 }
+
+.time-bonus {
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  font-size: 16px;
+  color: #4ade80;
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+}
+.time-bonus.show {
+  animation: tb 1s ease-out;
+}
+@keyframes tb {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}

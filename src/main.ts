@@ -13,7 +13,7 @@ document.querySelector(".version")!.textContent = `v${__APP_VERSION__}`;
 const title = initTitle({
   onStart: (id) => {
     title.hide();
-    game.start(makeSetup(id, loadConfig()));
+    game.start(id, loadConfig());
   }
 });
 initAccount(); // 追加

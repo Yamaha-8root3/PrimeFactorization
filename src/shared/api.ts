@@ -1,3 +1,4 @@
+import { Result } from "../screens/game/result";
 import { RunResult } from "./rules";
 
 const BASE: string = import.meta.env.DEV ? "http://localhost:8787" : "";
@@ -73,12 +74,12 @@ export async function changePassword(current: string, next: string) {
   return { error: r.data.error ?? "network" };
 }
 
-export async function submitScore(result: RunResult) {
+export async function submitScore(result: Result) {
   const r = await call<{ best: number; isBest: boolean }>("/api/score", {
     method: "POST",
     body: JSON.stringify(result)
   });
-  if (r.ok) clearRankCache(result.mode);
+  if (r.ok) clearRankCache(result.rulesetId);
   return r.ok ? r.data : { error: r.data.error ?? "network" };
 }
 
@@ -94,5 +95,9 @@ export async function fetchRanking(mode: string, limit = 20) {
 }
 export async function fetchBests() {
   const r = await call<{ bests: Record<string, number> }>("/api/best");
+  return r.ok ? r.data : { error: r.data.error ?? "network" };
+}
+export async function startPlay(rulesetId: string, mode: string) {
+  const r = await call<{ sessionId: string; seed: number }>("/api/play/start", { method: "POST", body: JSON.stringify({ rulesetId, mode }) });
   return r.ok ? r.data : { error: r.data.error ?? "network" };
 }

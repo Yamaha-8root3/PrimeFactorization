@@ -1,16 +1,22 @@
 import "./game.css";
-import { generate, prod, progressOf, stageOf, PRIME_POOL, type Stage } from "./generator";
-import { factorPoints, factorBase } from "./score";
+// import { generate, prod, progressOf, stageOf, PRIME_POOL, type Stage } from "./generator";
+// import { factorPoints, factorBase } from "./score";
 import { loadBest, saveBest } from "../../shared/storage";
 import { $, press } from "../../shared/dom";
-import { submitScore } from "../../shared/api";
+import { submitScore, startPlay } from "../../shared/api";
 import { currentUser } from "../title/account";
-import { RULESETS, DEFAULT_ID, DEFAULT_RULES, type Decision, type ProblemLog, type RunResult, makeSetup, type GameSetup, RuleSet } from "../../shared/rules";
+import { RULESETS, DEFAULT_ID, DEFAULT_RULES, type Decision, type ProblemLog, type RunResult, makeSetup, type GameSetup, RuleSet, Mode, DEFAULT_CONFIG } from "../../shared/rules";
+
+import { Config } from "../../shared/rules";
+import { Game } from "../../shared/game";
+import { Problem, ProblemState } from "../../shared/gameengine";
+import { calcStats, Rec, Result, Stats, SubmitResult, Verdict } from "./result";
+import { renderStats } from "./resultView";
 
 press($("btn-divide"), divide);
 press($("btn-undo"), undo);
 press($("btn-clear"), clearInput);
-press($("btn-restart"), beginCountdown);
+press($("btn-restart"), prepareNewGame);
 press($("btn-title"), toTitle);
 press($("btn-abort"), abortRun);
 
@@ -56,51 +62,30 @@ const KEYMAP: Record<string, number> = {
   k: 53
 };
 
-const keyOf = (p: number) =>
-  Object.keys(KEYMAP)
-    .find((k) => KEYMAP[k] === p)
-    ?.toUpperCase() ?? "";
-$("prime-buttons").innerHTML = PRIME_POOL.map((p) => `<button class="prime-btn" data-prime="${p}"><span class="num">${p}</span><kbd>${keyOf(p)}</kbd></button>`).join("");
-
-const isUnlocked = (p: number) => p <= stageOf(progress).maxPrime;
-document.querySelectorAll<HTMLElement>(".prime-btn").forEach((b) =>
-  press(b, () => {
-    const p = Number(b.dataset.prime);
-    if (isUnlocked(p)) addPrime(p);
-  })
-);
-
 //変数
 
-let setup: GameSetup = makeSetup(DEFAULT_ID);
-let TIME_LIMIT = setup.ruleset.rules.limitMs;
+let MODE: Mode = "solo";
+let RULESETID = DEFAULT_ID;
+let setup: GameSetup = makeSetup(DEFAULT_ID, DEFAULT_CONFIG, "solo");
+let CONFIG: Config = setup.config;
+let game: Game = new Game(setup);
+let TIME_LIMIT = game.timeLimitSec * 1000;
 
-type Phase = "idle" | "count" | "play" | "result"; // idle = ゲーム画面が非表示（タイトル中）
+type Phase = "idle" | "count" | "play" | "end" | "result"; // idle = ゲーム画面が非表示（タイトル中）
 let phase: Phase = "idle";
 let resultAt = 0;
 let onExit: () => void = () => {};
 const COUNT_STEP = 800;
+const END_DELAY = 1200; // ms
+let endMs = 0; // 時間切れ時点の最終問題の経過時間
+const RESULT_LOCK = 1000; // ms
+let restartLocked = false;
 
-type Rec = {
-  no: number;
-  n: number;
-  factors: number[];
-  d: number;
-  ms: number;
-  miss: number;
-  perfect: boolean;
-  base: number; // 基礎点（コンボ・PERFECT 倍率を掛ける前の合計）
-  pts: number; // 実際に得た得点
-  done: boolean; // false = 時間切れで未完了
-};
-
-const solveLog: { n: number; d: number; ms: number; miss: number }[] = [];
-const runLog: ProblemLog[] = [];
-let curDec: Decision[] = [];
-type Verdict = { v: number; state: "ok" | "ng" | "skip" };
+// const solveLog: { n: number; d: number; ms: number; miss: number }[] = [];
+// const runLog: ProblemLog[] = [];
+// let curDec: Decision[] = [];
 
 const playing = () => phase === "play";
-let gameStart = 0;
 let gameId = 0;
 const later = (ms: number, fn: () => void) => {
   const id = gameId;
@@ -108,28 +93,37 @@ const later = (ms: number, fn: () => void) => {
     if (id === gameId) fn();
   }, ms);
 };
+
+let sessionId = "";
+let startSeq = 0;
+let starting = false;
+
 let bestScore = 0;
 
-let target = 0;
+let curProblemState: ProblemState | null = null;
+let curProblem: Problem | null = null;
+let curProbStartedAt = 0;
 let curFactors: number[] = []; // 今の問題の正解（素因数分解）
 let entered: number[] = [];
 let committed = 0; // 仮決定済みの入力数
 
+let startAt = 0;
+let endAt = 0;
 let qno = 0;
 let combo = 0;
 let comboShown = 0;
-let maxCombo = 0;
 let probBase = 0; // この問題の基礎点の合計
-let decides = 0; // この問題での決定回数
 let probPts = 0; // この問題で得た点
-let score = 0;
-let miss = 0;
-let progress = 0;
 
-let startedAt = 0;
-const history: Rec[] = [];
-let curDiff = 0;
-let curStage: Stage = stageOf(0);
+let score = 0;
+let maxCombo = 0;
+let decides = 0; // この問題での決定回数
+let miss = 0;
+// let progress = 0;
+
+let submitResults: SubmitResult[] = [];
+let records: Rec[] = [];
+// let curStage: Stage = stageOf(0);
 let AUTO_FINISH = false; // 一時停止中。true で従来の「積が一致したら自動回答」に戻る
 const STEP = 50; // ms。判定済みの項目を順に消す演出の間隔
 const T = { ok: 100, ng: 300, skip: 200 }; // ms
@@ -152,6 +146,23 @@ let scoreShown = 0,
 const BUF_MAX = 6;
 let buf = "";
 
+const keyOf = (p: number) =>
+  Object.keys(KEYMAP)
+    .find((k) => KEYMAP[k] === p)
+    ?.toUpperCase() ?? "";
+$("prime-buttons").innerHTML = game.usePrimes.map((p) => `<button class="prime-btn" data-prime="${p}"><span class="num">${p}</span><kbd>${keyOf(p)}</kbd></button>`).join("");
+
+// const isUnlocked = (p: number) => p <= stageOf(progress).maxPrime;
+document.querySelectorAll<HTMLElement>(".prime-btn").forEach((b) =>
+  press(b, () => {
+    const p = Number(b.dataset.prime);
+    // if (isUnlocked(p)) addPrime(p);
+    addPrime(p);
+  })
+);
+
+const prod = (a: number[]) => a.reduce((x, y) => x * y, 1);
+
 let abortTimer = 0;
 // 2回押しで中断。記録・送信はせずタイトルへ戻る
 function abortRun() {
@@ -172,6 +183,27 @@ function disarmAbort() {
   $("btn-abort").classList.remove("armed");
 }
 
+let finishing = false; // 終了処理中（リトライ不可）
+let finishSeq = 0; // 古い送信の完了が新しいゲームのボタンを操作しないための番号
+const setFinishing = (on: boolean) => {
+  finishing = on;
+};
+
+const syncRestart = () => {
+  ($("btn-restart") as HTMLButtonElement).disabled = finishing || restartLocked;
+  ($("btn-title") as HTMLButtonElement).disabled = finishing || restartLocked;
+};
+function lockRestart(ms: number) {
+  restartLocked = true;
+  syncRestart();
+  const my = finishSeq;
+  setTimeout(() => {
+    if (my !== finishSeq) return; // 別ゲームに移っていたら何もしない
+    restartLocked = false;
+    syncRestart();
+  }, ms);
+}
+
 //素因数分解の整形テキスト生成
 function expo(list: number[], html: boolean): string {
   const m = new Map<number, number>();
@@ -180,26 +212,42 @@ function expo(list: number[], html: boolean): string {
 }
 
 function nextProblem() {
-  const pb = generate(progress);
-  curFactors = [...pb.factors].sort((a, b) => a - b);
-  probBase = curFactors.reduce((s, p) => s + factorBase(p), 0);
   qno++;
-  target = pb.n;
-  curStage = pb.stage;
-  curDiff = pb.d;
+  curProblemState = game.next();
+  curProblem = curProblemState.p;
+  curFactors = curProblem.factors;
+  probBase = curProblemState.total;
+  // curStage = pb.stage;
   entered = [];
   buf = "";
   decides = 0;
   probPts = 0;
   committed = 0;
-  startedAt = performance.now();
+  curProbStartedAt = performance.now();
+  submitResults = [];
   render();
 }
 
 function render() {
   el.qno.textContent = `Q${qno}`;
-  el.target.textContent = String(target / prod(entered.slice(0, committed)));
-  el.originaltarget.textContent = String(target);
+  if (curProblem) {
+    el.target.textContent = String(curProblem.target / prod(entered.slice(0, committed)));
+    el.originaltarget.textContent = String(curProblem.target);
+    el.diff.textContent = curProblem?.d.toFixed(2);
+
+    const row = (r: Rec) =>
+      `<li><span class="h-no">${r.no}</span><span class="h-n">${r.n}</span>` + `<span class="h-d">${r.d.toFixed(2)}</span><span class="h-s">${r.perfect ? "★" : ""}</span>` + `<span class="h-p">+${r.pts.toLocaleString()}</span><span class="h-t">${(r.ms / 1000).toFixed(1)}s</span></li>`;
+    // 最上段: 解いている途中の問題と途中得点
+    const curRow = playing()
+      ? `<li class="cur"><span class="h-no">${qno}</span><span class="h-n">${curProblem.target}</span>` + `<span class="h-d">${curProblem.d.toFixed(2)}</span><span class="h-s"></span>` + `<span class="h-p">+${probPts.toLocaleString()}</span><span class="h-t">…</span></li>`
+      : "";
+    const r = [...records];
+    r.reverse();
+    el.history.innerHTML = curRow + r.map(row).join("");
+  } else {
+    el.target.textContent = "";
+    el.originaltarget.textContent = "";
+  }
   // 回答欄は未確定分のみ
   el.answer.innerHTML = entered
     .slice(committed)
@@ -207,7 +255,7 @@ function render() {
     .join("");
   // 確定分＋未確定分の整形済み表示
   const pending = entered.slice(committed);
-  const bad = buf !== "" && !PRIME_POOL.includes(Number(buf));
+  const bad = buf !== "" && !game.usePrimes.includes(Number(buf));
   const typing = buf ? `<span class="chip typing${bad ? " bad" : ""}">${buf}</span>` : "";
   el.answer.innerHTML = `<span class="ltr">${pending.map((p) => `<span class="chip">${p}</span>`).join("")}${typing}</span>`;
   el.expoInput.innerHTML = `<span class="ltr">${expo(pending, true)}</span>`;
@@ -215,25 +263,14 @@ function render() {
   el.err.hidden = true;
   el.score.textContent = score.toLocaleString();
 
-  const row = (r: Rec) =>
-    `<li><span class="h-no">${r.no}</span><span class="h-n">${r.n}</span>` + `<span class="h-d">${r.d.toFixed(2)}</span><span class="h-s">${r.perfect ? "★" : ""}</span>` + `<span class="h-p">+${r.pts.toLocaleString()}</span><span class="h-t">${(r.ms / 1000).toFixed(1)}s</span></li>`;
-  // 最上段: 解いている途中の問題と途中得点
-  const curRow = playing() ? `<li class="cur"><span class="h-no">${qno}</span><span class="h-n">${target}</span>` + `<span class="h-d">${curDiff.toFixed(2)}</span><span class="h-s"></span>` + `<span class="h-p">+${probPts.toLocaleString()}</span><span class="h-t">…</span></li>` : "";
+  // el.range.textContent = `${curStage.dMin.toFixed(1)} – ${curStage.dMax.toFixed(1)}`;
 
-  el.history.innerHTML = curRow + history.map(row).join("");
-
-  el.diff.textContent = curDiff.toFixed(2);
-  el.range.textContent = `${curStage.dMin.toFixed(1)} – ${curStage.dMax.toFixed(1)}`;
-
-  const st = summarize(history);
+  const st = summarize(records);
   el.stSolved.textContent = String(st.solved);
   el.stMiss.textContent = String(st.misses + miss); // 現在の問題の誤りも含む
   el.stAvg.textContent = st.solved ? `${(st.avgMs / 1000).toFixed(1)}s` : "-";
-  el.stBest.textContent = Math.max(bestScore, score).toLocaleString();
-  el.maxp.textContent = `≤ ${curStage.maxPrime}`;
-  document.querySelectorAll<HTMLButtonElement>(".prime-btn").forEach((b) => {
-    b.disabled = Number(b.dataset.prime) > curStage.maxPrime;
-  });
+  el.stBest.textContent = bestScore.toLocaleString();
+  // el.maxp.textContent = `≤ ${curStage.maxPrime}`;
 }
 
 function typeDigit(d: string) {
@@ -250,7 +287,7 @@ function commitBuf() {
   if (!buf) return;
   const v = Number(buf);
   buf = "";
-  if (!PRIME_POOL.includes(v)) {
+  if (!game.usePrimes.includes(v)) {
     render();
     return;
   } else {
@@ -261,7 +298,7 @@ function commitBuf() {
 function addPrime(p: number) {
   if (!playing()) return;
   entered.push(p);
-  if (AUTO_FINISH && prod(entered) === target) finish(false);
+  if (AUTO_FINISH && prod(entered) === curProblem?.target) finish(false);
   else render();
 }
 
@@ -281,58 +318,54 @@ function undo() {
 }
 
 function divide() {
-  if (!playing()) return;
+  if (!playing() || !curProblem || !curProblemState) return;
   commitBuf();
   const pending = entered.slice(committed);
+  let result: SubmitResult = {
+    time: performance.now() - curProbStartedAt,
+    inputs: [],
+    score: 0,
+    startcombo: combo,
+    timeAdd: 0
+  };
   if (!pending.length) return;
 
-  let rem = target / prod(entered.slice(0, committed));
-  const verdicts: Verdict[] = [];
-  let stopped = false;
-  for (const p of pending) {
-    if (stopped) {
-      verdicts.push({ v: p, state: "skip" });
-      continue;
-    }
-    const ok = rem % p === 0;
-    verdicts.push({ v: p, state: ok ? "ok" : "ng" });
-    if (ok) rem /= p;
-    else stopped = true;
-  }
-  const okCount = verdicts.filter((x) => x.state === "ok").length;
-  const perfect = decides === 0 && !stopped && rem === 1;
+  const r = game.submit(curProblemState, pending);
+  const verdicts: Verdict[] = pending.map((v, i) => ({
+    v,
+    state: i < r.accepted ? "ok" : i === r.accepted && r.missed ? "ng" : "skip"
+  }));
+  result.inputs = verdicts;
   decides++;
 
   const ds = playTrial(verdicts);
-  let gained = 0;
-  verdicts.forEach((x, i) => {
-    if (x.state === "ok") {
-      combo++;
-      const pts = factorPoints(x.v, combo, perfect);
-      gained += pts;
-      const c = combo,
-        run = score + gained; // この時点までの累計
-      later(ds[i], () => {
-        addGain(pts, perfect);
-        setScoreTarget(run);
-        showCombo(c);
-      });
-    } else if (x.state === "ng") {
-      later(ds[i], breakCombo);
-    }
+  let run = score;
+  r.factors.forEach((f, i) => {
+    run += f.gain;
+    const runNow = run;
+    later(ds[i], () => {
+      addGain(f.gain, r.perfect);
+      setScoreTarget(runNow);
+      showCombo(f.combo);
+    });
   });
-  maxCombo = Math.max(maxCombo, combo);
-  if (stopped) {
+  if (r.missed) {
+    later(ds[r.accepted], breakCombo);
     miss++;
-    combo = 0;
   }
-  score += gained;
-  probPts += gained;
-  if (perfect) showBanner("perfect");
+  if (r.factors.length) maxCombo = Math.max(maxCombo, r.factors[r.factors.length - 1].combo);
+  if (r.timeAdd > 0) addTime(r.timeAdd);
+  score += r.gain;
+  probPts += r.gain;
+  result.timeAdd = r.timeAdd;
+  console.log(result.timeAdd);
+  result.score = r.gain;
+  submitResults.push(result);
+  if (r.perfect) showBanner("perfect");
 
-  entered.length = committed + okCount;
+  entered.length = committed + r.accepted;
   committed = entered.length;
-  if (rem === 1) finish(perfect);
+  if (r.done) finish(r.perfect);
   else render();
 }
 
@@ -359,22 +392,26 @@ function playTrial(vs: Verdict[]) {
 }
 
 function finish(perfect: boolean) {
-  const ms = Math.round(performance.now() - startedAt);
+  const ms = Math.round(performance.now() - curProbStartedAt);
+
+  const fin = game.finish(curProblemState!, ms); // probElapsedSec: この問題の解答時間(秒)
+  score += fin.bonus;
+  probPts += fin.bonus;
   const rec: Rec = {
     no: qno,
-    n: target,
+    n: curProblem?.target || 0,
     factors: [...entered],
-    d: curDiff,
+    d: curProblem?.d || 0,
     ms,
     miss,
     perfect,
     base: probBase,
     pts: probPts,
-    done: true
+    done: true,
+    submits: submitResults
   };
-  history.unshift(rec);
-  solveLog.push(rec);
-  progress += progressOf(curDiff);
+  console.log(submitResults);
+  records.push(rec);
   miss = 0;
   nextProblem();
 }
@@ -392,6 +429,19 @@ function addGain(pts: number, perfect: boolean) {
     g.classList.remove("on", "bump"); // フェードアウト
     gainAcc = 0;
   }, GAIN_HOLD);
+}
+
+function addTime(sec: number) {
+  endAt += sec * 1000;
+  showTimeBonus(sec);
+}
+
+function showTimeBonus(sec: number) {
+  const el = $("timeBonus");
+  el.textContent = `+${sec}s`;
+  el.classList.remove("show");
+  void el.offsetWidth; // アニメーションの再起動
+  el.classList.add("show");
 }
 
 function setScoreTarget(to: number) {
@@ -444,6 +494,23 @@ function showBanner(id: "perfect" | "go") {
   void b.offsetWidth; // アニメーション再始動
   b.classList.add("show");
 }
+function resetBanners() {
+  //start Go
+  ["perfect", "go"].forEach((id) => {
+    const b = $(id);
+    b.classList.remove("show");
+    void b.offsetWidth;
+  });
+  //Combo
+  const box = $("combo");
+  box.hidden = true;
+  box.className = "combo";
+  void box.offsetWidth;
+  //Time
+  const el = $("timeBonus");
+  el.classList.remove("show");
+  void el.offsetWidth;
+}
 
 function summarize(recs: Rec[]) {
   const n = recs.length;
@@ -466,7 +533,7 @@ document.addEventListener("keydown", (e) => {
     e.preventDefault();
     if (phase === "play") return divide();
     // 時間切れ直後の連打で、リザルトを飛ばして再開しないようにする
-    if (phase === "result" && performance.now() - resultAt >= 800) return beginCountdown();
+    if (phase === "result" && performance.now() - resultAt >= RESULT_LOCK) return prepareNewGame();
     return;
   }
   if (!playing()) return;
@@ -479,7 +546,8 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Backspace") return buf ? backBuf() : undo();
   if (e.key === "Escape") return clearInput();
   const p = KEYMAP[e.key.toLowerCase()];
-  if (p !== undefined && isUnlocked(p)) addPrime(p);
+  // if (p !== undefined && isUnlocked(p)) addPrime(p);
+  if (p !== undefined) addPrime(p);
 });
 
 document.querySelectorAll<HTMLElement>(".prime-btn").forEach((b) => {
@@ -495,12 +563,10 @@ setInterval(tick, 16);
 // --------------------------
 
 function beginCountdown() {
-  if (phase === "count" || phase === "play") return;
-  TIME_LIMIT = setup.ruleset.rules.limitMs;
+  if ((phase === "result" && finishing) || phase === "count" || phase === "play") return;
   phase = "count";
   $("screen-game").hidden = false;
   $("result").hidden = true;
-  resetGame();
   if (!setup.config.showCountdown) {
     startGame(); // ここで計測開始
     return;
@@ -524,31 +590,35 @@ function beginCountdown() {
   );
 }
 function startGame() {
+  if (phase !== "count") return;
+
   phase = "play";
-  gameStart = performance.now();
-  $("result").hidden = true;
+  startAt = performance.now();
+  endAt = startAt + TIME_LIMIT;
   nextProblem();
 }
 
 //カウントダウン時に行うinit
 function resetGame() {
+  finishSeq++;
+
+  setFinishing(false);
+  restartLocked = false;
   gameId++; // 前のゲームの予約（ポップなど）を無効化。later はこの後に予約すること
   qno = 0;
   score = 0;
   miss = 0;
-  progress = 0;
   combo = 0;
   maxCombo = 0;
-  history.length = 0; // solveLog は校正用に保持
-  target = 0;
+  submitResults = [];
+  records = [];
   entered = [];
+
   committed = 0;
   buf = "";
   decides = 0;
   probPts = 0;
   probBase = 0;
-  curDiff = 0;
-  curStage = stageOf(0);
   scoreShown = scoreFrom = scoreTo = 0;
   el.score.textContent = "0";
   comboShown = 0;
@@ -561,7 +631,7 @@ function resetGame() {
   const [sec, frac] = (TIME_LIMIT / 1000).toFixed(3).split(".");
   el.timer.innerHTML = `${sec}<small>.${frac}</small>`;
 
-  loadBest(setup.ruleset.id);
+  bestScore = loadBest(setup.ruleset.id);
 
   disarmAbort();
   render();
@@ -569,38 +639,47 @@ function resetGame() {
 
 function endGame() {
   phase = "result";
+  setFinishing(true);
   resultAt = performance.now();
-  const s = summarize(history);
   const prev = loadBest(setup.ruleset.id);
   const isNew = score > prev;
   if (isNew) saveBest(setup.ruleset.id, score);
   bestScore = Math.max(prev, score);
-  $("final-score").textContent = score.toLocaleString();
-  const rows: [string, string][] = [
-    ["正解", `${s.solved}問`],
-    ["PERFECT", `${s.perfects}回`],
-    ["Miss", `${s.misses}回`],
-    ["平均解答時間", `${(s.avgMs / 1000).toFixed(1)}s`],
-    ["Max Combo", String(maxCombo)],
-    ["最高難易度", s.maxD.toFixed(1)],
-    ["最大の素因数", s.maxPrime ? String(s.maxPrime) : "-"],
-    ["最高得点の問題", s.best ? `${s.best.n} (+${s.best.pts.toLocaleString()})` : "-"],
-    ["ハイスコア", Math.max(prev, score).toLocaleString() + (isNew ? "  NEW" : "")]
-  ];
-  $("final-detail").innerHTML = rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
-  const list: Rec[] = [...history];
-  list.unshift({
+
+  let finalProblemRec: Rec = {
     no: qno,
-    n: target,
+    n: curProblem?.target || 0,
     factors: curFactors,
-    d: curDiff,
-    ms: Math.round(performance.now() - startedAt),
+    d: curProblem?.d || 0,
+    ms: endMs,
     miss,
     perfect: false,
     base: probBase,
     pts: probPts,
-    done: false
-  });
+    done: false,
+    submits: submitResults
+  };
+  records.push(finalProblemRec);
+
+  const result: Result = {
+    sessionId: sessionId,
+    rulesetId: setup.ruleset.id,
+    rulesetVersion: setup.ruleset.ver,
+    mode: setup.mode,
+    customRuleset: undefined,
+    seed: setup.seed,
+    recs: records,
+    stats: calcStats(records),
+    playerId: currentUser?.id,
+    playedAt: startAt,
+    playTime: endAt - startAt
+  };
+
+  renderStats($("result-stats"), result, prev);
+
+  const list: Rec[] = [...records];
+  // 順番を反転
+  list.reverse();
 
   const ans = (r: Rec) => `= ${expo(r.factors, true)}`;
   $("final-list").innerHTML = list
@@ -620,28 +699,32 @@ function endGame() {
     )
     .join("");
   $("result").hidden = false;
-  const result = buildResult();
   console.log(result);
-  if (currentUser && setup.ruleset.ranked) submitScore(result);
-}
-function buildResult(): RunResult {
-  const problems = [...runLog];
-  if (curDec.length) problems.push({ n: target, dec: curDec });
-  return { mode: setup.ruleset.id, rulesVer: setup.ruleset.ver, seed: setup.seed, score, solved: history.length, problems };
+
+  if (currentUser && setup.ruleset.ranked && sessionId) {
+    submitScore(result);
+    setFinishing(false);
+  } else setFinishing(false);
+
+  lockRestart(RESULT_LOCK);
 }
 
 // main.ts — tick を置き換え（残り時間表示。問題ごとの経過は startedAt で別管理のまま）
 function tick() {
   if (!playing()) return;
-  const left = Math.max(0, TIME_LIMIT - (performance.now() - gameStart));
+  const left = Math.max(0, endAt - performance.now());
   // const m = Math.floor(left / 60000);
   // const s = ((left % 60000) / 1000).toFixed(1).padStart(4, "0");
   const [sec, frac] = (left / 1000).toFixed(3).split(".");
   el.timer.innerHTML = `${sec}<small>.${frac}</small>`;
-  if (left <= 0) endGame();
+  if (left <= 0) {
+    endMs = Math.round(performance.now() - curProbStartedAt);
+    divide(); // playing() が true のうちに最後の入力を確定
+    phase = "end";
+    later(END_DELAY, endGame);
+  }
 }
 
-$("btn-restart").addEventListener("click", startGame);
 render();
 
 //レイアウト関連
@@ -663,16 +746,40 @@ updateBar();
 
 export function initGame(opt: { onExit: () => void }) {
   onExit = opt.onExit;
-  return { start: initRules };
+  return { start: prepareNewGame };
 }
 
-function initRules(rule?: GameSetup) {
-  // console.log(rule);
-  setup = rule || makeSetup(DEFAULT_ID);
+async function prepareNewGame(rulesetid?: string, config?: Config, mode: Mode = "solo") {
+  if (starting) return;
+  const my = ++startSeq;
+  $("result").hidden = true;
+  resetGame();
+  resetBanners();
+  if (rulesetid) RULESETID = rulesetid;
+  if (config) CONFIG = config;
+  if (mode) MODE = mode;
+  setup = makeSetup(RULESETID, CONFIG, MODE);
+  sessionId = "";
+  if (currentUser && setup.ruleset.ranked) {
+    starting = true;
+    const s = await startPlay(setup.ruleset.id, setup.mode);
+    starting = false;
+    if (my !== startSeq) return; // 待機中にタイトルへ戻った
+    if ("error" in s)
+      console.warn("play/start:", s.error); // ローカル seed のまま（送信なし）
+    else {
+      setup = { ...setup, seed: s.seed };
+      sessionId = s.sessionId;
+    }
+  }
+  game = new Game(setup);
+  TIME_LIMIT = game.timeLimitSec * 1000;
   beginCountdown();
 }
 
 function toTitle() {
+  startSeq++;
+  starting = false;
   phase = "idle";
   gameId++;
   $("result").hidden = true;

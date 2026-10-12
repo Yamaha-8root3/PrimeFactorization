@@ -11,7 +11,7 @@ export function initTitle(opt: { onStart: (id: string) => void }) {
     // console.log(sel.value);
     opt.onStart(sel.value);
   };
-  press($("btn-start"), start);
+  $("btn-start").addEventListener("click", start);
   const refreshBest = () => ($("title-best").textContent = loadBest(sel.value).toLocaleString());
   sel.addEventListener("change", refreshBest);
   onBest(refreshBest);
